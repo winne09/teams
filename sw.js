@@ -2,7 +2,7 @@
 // Legt nur die App-Dateien auf dem Gerät ab. Die Namen liegen getrennt im
 // Browser-Speicher des Geräts und werden nie übertragen.
 // Bei jeder Änderung an der App: CACHE-Version erhöhen.
-const CACHE = 'teams-v2.1';
+const CACHE = 'teams-v2.2';
 const FILES = [
   './',
   './index.html',
@@ -11,9 +11,18 @@ const FILES = [
   './icons/icon-512.png',
   './icons/apple-touch-icon.png'
 ];
+// Texterkennung für „Namen aus Foto“ (ca. 9 MB): wird beim ersten Start im Hintergrund
+// mitgeladen, damit sie auch in der Halle ohne Internet funktioniert.
+const OCR_FILES = [
+  './ocr/tesseract.min.js',
+  './ocr/worker.min.js',
+  './ocr/tesseract-core-lstm.wasm.js',
+  './ocr/tesseract-core-simd-lstm.wasm.js',
+  './ocr/deu.traineddata.gz'
+];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES).then(() => c.addAll(OCR_FILES).catch(() => {}))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {
