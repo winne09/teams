@@ -54,10 +54,23 @@
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 12px; }
   .st .nm::before { content:"✓"; color:#86efac; font-weight:800; margin-right:10px; }
   .st.abs { opacity:.5; } .st.abs .nm { text-decoration:line-through; } .st.abs .nm::before { content:"✗"; color:#fca5a5; }
-  .st .lv { border:0; border-left:1px solid var(--line); border-radius:0; background:none; min-width:74px; padding:0 8px;
-    font-size:15px; letter-spacing:2px; color:var(--acc); }
-  .st .lv.none { color:#52525b; }
-  body:not(.balance) .st .lv { display:none; }
+  .st .lv { border:0; border-left:1px solid var(--line); border-radius:0; background:none; padding:0 10px;
+    font-size:13px; letter-spacing:1px; color:var(--acc); display:flex; align-items:center; gap:8px; white-space:nowrap; }
+  .st .lv .g { font-size:15px; font-weight:800; letter-spacing:0; color:var(--fg); min-width:1.1em; }
+  .st .lv .none { color:#52525b; }
+  body:not(.balance):not(.gender) .st .lv { display:none; }
+  body:not(.balance) .st .lv .dots, body:not(.gender) .st .lv .g { display:none; }
+
+  /* Eingabe Stärke / Geschlecht */
+  #pick { position:fixed; left:0; right:0; bottom:0; z-index:25; background:#111113; border-top:2px solid var(--acc);
+    border-radius:18px 18px 0 0; padding:14px calc(14px + env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left));
+    transform:translateY(110%); visibility:hidden; transition:transform .2s, visibility 0s .2s; box-shadow:0 -10px 30px #000; }
+  #pick.open { transform:none; visibility:visible; transition:transform .2s; }
+  #pick .in { max-width:640px; margin:0 auto; display:flex; flex-direction:column; gap:10px; }
+  #pickName { font-size:24px; font-weight:800; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #pick .lbl { color:var(--mut); font-size:14px; margin-bottom:-4px; }
+  #pick .seg button { padding:0 4px; font-size:18px; }
+  body:not(.balance) #pick .forBal, body:not(.gender) #pick .forGen { display:none; }
   .empty { color:var(--mut); padding:12px 0; }
 
   /* Ergebnis */
@@ -121,10 +134,25 @@
     </div>
     <p class="hint" id="preview" style="text-align:center"></p>
     <label class="switch"><input type="checkbox" id="balance"> Stärken ausgleichen</label>
-    <p class="hint" id="balHint">Bei jedem Namen erscheint ein Knopf: ●○○ schwächer, ●●○ mittel, ●●● stärker. Ohne Angabe zählt „mittel“. Die Stufen sind im Ergebnis nicht zu sehen.</p>
+    <label class="switch"><input type="checkbox" id="gender"> Mädchen und Jungen ausgleichen</label>
+    <p class="hint" id="balHint">Tippe rechts neben einem Namen, um Stärke (1 schwächer bis 5 stärker) und M/J einzutragen. Mit „Weiter ›“ geht es schnell durch die ganze Liste. Ohne Angabe zählt Stärke 3. Im Ergebnis ist davon nichts zu sehen.</p>
   </section>
 
   <button class="big acc" id="go">Teams bilden</button>
+  <div id="pick" role="dialog" aria-label="Stärke und Geschlecht eintragen">
+    <div class="in">
+      <div id="pickName"></div>
+      <div class="lbl forBal">Stärke</div>
+      <div class="seg forBal" id="pickLv"></div>
+      <div class="lbl forGen">Geschlecht</div>
+      <div class="seg forGen" id="pickG"></div>
+      <div class="row">
+        <button id="pickPrev" class="round" aria-label="vorheriger Name">‹</button>
+        <button id="pickNext" class="acc grow">Weiter ›</button>
+        <button id="pickDone">Fertig</button>
+      </div>
+    </div>
+  </div>
   <div id="offline"></div>
   <footer>
     <p>Alle Namen bleiben nur auf diesem Gerät gespeichert. Kein Konto, keine Datenübertragung, kein Tracking.</p>
@@ -168,13 +196,19 @@
     ['Türkis','#2dd4bf','#111'], ['Grau','#71717a','#fff'], ['Braun','#a16207','#fff'], ['Hellblau','#7dd3fc','#111']
   ];
   const MAXT = COLORS.length;
+  const G_SHORT = { w:'M', m:'J', '':'–' }, G_LONG = { w:'Mädchen', m:'Junge', '':'ohne Angabe' };
 
   let S;
   function load() {
     try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) { S = null; }
-    if (!S || !Array.isArray(S.classes)) S = { classes:[], cur:null, mode:'count', count:2, size:5, balance:false };
+    if (!S || !Array.isArray(S.classes)) S = { ver:2, classes:[], cur:null, mode:'count', count:2, size:5, balance:false, gender:false };
+    if (S.ver !== 2) { // v1 hatte 3 Stufen: auf 5 umrechnen (1→1, 2→3, 3→5)
+      S.classes.forEach(c => c.st.forEach(s => { if (s.lv) s.lv = s.lv * 2 - 1; s.g = s.g || ''; }));
+      S.ver = 2; S.gender = false;
+    }
     if (!S.classes.length) { const c = newClass('Meine Klasse'); S.cur = c.id; }
     if (!cur()) S.cur = S.classes[0].id;
+    save();
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
   function newClass(name) { const c = { id:Date.now().toString(36)+Math.random().toString(36).slice(2,6), name, st:[] }; S.classes.push(c); return c; }
@@ -195,8 +229,10 @@
   // ---------- Anzeige Startseite ----------
   function render() {
     document.body.classList.toggle('balance', !!S.balance);
+    document.body.classList.toggle('gender', !!S.gender);
     $('balance').checked = !!S.balance;
-    $('balHint').style.display = S.balance ? '' : 'none';
+    $('gender').checked = !!S.gender;
+    $('balHint').style.display = S.balance || S.gender ? '' : 'none';
     const sel = $('cls'); sel.innerHTML = '';
     S.classes.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; sel.appendChild(o); });
     sel.value = S.cur;
@@ -207,14 +243,23 @@
       const nm = document.createElement('button'); nm.className = 'nm'; nm.textContent = s.n;
       nm.setAttribute('aria-label', s.n + (s.abs ? ', abwesend' : ', anwesend'));
       nm.onclick = () => { s.abs = !s.abs; save(); render(); };
-      const lv = document.createElement('button'); lv.className = 'lv' + (s.lv ? '' : ' none');
-      lv.textContent = s.lv ? '●'.repeat(s.lv) + '○'.repeat(3 - s.lv) : '○○○';
-      lv.setAttribute('aria-label', 'Stärke ' + (s.lv || 'ohne Angabe'));
-      lv.onclick = () => { s.lv = ((s.lv || 0) + 1) % 4; save(); render(); };
+      const lv = document.createElement('button'); lv.className = 'lv';
+      lv.innerHTML = '<span class="g"></span><span class="dots"></span>';
+      lv.firstChild.textContent = G_SHORT[s.g || ''];
+      lv.firstChild.classList.toggle('none', !s.g);
+      lv.lastChild.textContent = s.lv ? '●'.repeat(s.lv) + '○'.repeat(5 - s.lv) : '○○○○○';
+      lv.lastChild.classList.toggle('none', !s.lv);
+      lv.setAttribute('aria-label', s.n + ': Stärke ' + (s.lv || 'ohne Angabe') + ', ' + G_LONG[s.g || '']);
+      lv.onclick = () => openPick(i);
       d.append(nm, lv); list.appendChild(d);
     });
     const n = present().length;
-    $('count').innerHTML = '<b>' + n + '</b> von ' + c.st.length + ' da';
+    let txt = '<b>' + n + '</b> von ' + c.st.length + ' da';
+    if (S.gender) {
+      const w = present().filter(s => s.g === 'w').length, m = present().filter(s => s.g === 'm').length;
+      txt += ' · ' + w + ' M · ' + m + ' J' + (n - w - m ? ' · ' + (n - w - m) + ' o. A.' : '');
+    }
+    $('count').innerHTML = txt;
     $('byCount').classList.toggle('on', S.mode === 'count');
     $('bySize').classList.toggle('on', S.mode === 'size');
     $('val').textContent = S.mode === 'count' ? S.count : S.size;
@@ -233,12 +278,21 @@
     let best = null;
     // mehrere Versuche: vermeidet, dass genau dieselbe Einteilung wie eben herauskommt
     for (let t = 0; t < 8; t++) {
-      const teams = Array.from({ length:k }, () => ({ m:[], sum:0 }));
+      const teams = Array.from({ length:k }, () => ({ m:[], sum:0, g:{ w:0, m:0, '':0 } }));
       let order = shuffle(pl.slice());
-      if (S.balance) order.sort((a, b) => (b.lv || 2) - (a.lv || 2)); // stabil: innerhalb einer Stufe zufällig
+      if (S.balance) order.sort((a, b) => (b.lv || 3) - (a.lv || 3)); // stabil: innerhalb einer Stufe zufällig
+      if (S.gender) { // seltenere Gruppe zuerst verteilen, damit sie überall gleich oft vorkommt
+        const cnt = g => order.filter(p => (p.g || '') === g).length;
+        const rank = { w:cnt('w'), m:cnt('m'), '':1e9 };
+        order.sort((a, b) => rank[a.g || ''] - rank[b.g || '']);
+      }
       for (const p of order) {
-        const v = S.balance ? (p.lv || 2) : 0;
+        const v = S.balance ? (p.lv || 3) : 0, g = p.g || '';
         let cand = teams.map((tm, i) => i).filter(i => teams[i].m.length < cap[i]);
+        if (S.gender && g) { // zuerst: Team mit den wenigsten dieses Geschlechts
+          const min = Math.min(...cand.map(i => teams[i].g[g]));
+          cand = cand.filter(i => teams[i].g[g] === min);
+        }
         if (S.balance) {
           const min = Math.min(...cand.map(i => teams[i].sum));
           cand = cand.filter(i => teams[i].sum === min);
@@ -250,7 +304,7 @@
           cand = cand.filter(i => teams[i].m.length / cap[i] === fill);
         }
         const i = cand[Math.floor(Math.random() * cand.length)];
-        teams[i].m.push(p.n); teams[i].sum += v;
+        teams[i].m.push(p.n); teams[i].sum += v; teams[i].g[g]++;
       }
       const key = teams.map(tm => tm.m.slice().sort().join(',')).sort().join('|');
       best = teams;
@@ -330,13 +384,41 @@
     c.name = $('clsName').value.trim() || c.name || 'Klasse';
     const old = new Map(c.st.map(s => [s.n, s]));
     const seen = new Set();
-    c.st = names.filter(n => !seen.has(n) && seen.add(n)).map(n => old.get(n) || { n, lv:0, abs:false });
+    c.st = names.filter(n => !seen.has(n) && seen.add(n)).map(n => old.get(n) || { n, lv:0, g:'', abs:false });
     save(); closeEdit(); render();
   }
   function closeEdit() { $('dlg').classList.remove('open'); }
 
+  // ---------- Stärke / Geschlecht eintragen ----------
+  let pi = -1;
+  function openPick(i) { pi = i; drawPick(); $('pick').classList.add('open'); }
+  function closePick() { pi = -1; $('pick').classList.remove('open'); }
+  function drawPick() {
+    const s = cur().st[pi]; if (!s) return closePick();
+    $('pickName').textContent = s.n;
+    const lvBox = $('pickLv'); lvBox.innerHTML = '';
+    [['–',0],['1',1],['2',2],['3',3],['4',4],['5',5]].forEach(([t, v]) => {
+      const b = document.createElement('button'); b.textContent = t; b.classList.toggle('on', (s.lv || 0) === v);
+      b.setAttribute('aria-label', v ? 'Stärke ' + v : 'Stärke ohne Angabe');
+      b.onclick = () => { s.lv = v; save(); render(); drawPick(); };
+      lvBox.appendChild(b);
+    });
+    const gBox = $('pickG'); gBox.innerHTML = '';
+    [['Mädchen','w'],['Junge','m'],['o. A.','']].forEach(([t, v]) => {
+      const b = document.createElement('button'); b.textContent = t; b.classList.toggle('on', (s.g || '') === v);
+      b.onclick = () => { s.g = v; save(); render(); drawPick(); };
+      gBox.appendChild(b);
+    });
+    $('pickPrev').disabled = pi === 0; $('pickPrev').style.opacity = pi === 0 ? .4 : 1;
+    $('pickNext').textContent = pi >= cur().st.length - 1 ? 'Fertig ✓' : 'Weiter ›';
+  }
+  $('pickPrev').onclick = () => { if (pi > 0) { pi--; drawPick(); } };
+  $('pickNext').onclick = () => { if (pi < cur().st.length - 1) { pi++; drawPick(); } else closePick(); };
+  $('pickDone').onclick = closePick;
+
   // ---------- Bedienung ----------
-  $('cls').onchange = e => { S.cur = e.target.value; save(); render(); };
+  $('gender').onchange = e => { S.gender = e.target.checked; save(); render(); };
+  $('cls').onchange = e => { closePick(); S.cur = e.target.value; save(); render(); };
   $('newCls').onclick = () => openEdit(true);
   $('editBtn').onclick = () => openEdit(false);
   $('allIn').onclick = () => { cur().st.forEach(s => s.abs = false); save(); render(); };
@@ -361,6 +443,7 @@
   addEventListener('resize', () => { if (document.body.classList.contains('show')) showResult(); });
   addEventListener('keydown', e => {
     if ($('dlg').classList.contains('open')) { if (e.key === 'Escape') closeEdit(); return; }
+    if (pi >= 0 && e.key === 'Escape') { closePick(); return; }
     if (e.key === 'Escape') $('back').click();
     if ((e.key === ' ' || e.key === 'Enter') && document.body.classList.contains('show')) { e.preventDefault(); go(); }
   });
