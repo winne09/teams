@@ -29,7 +29,7 @@
     border:1px solid var(--line); border-radius:12px; min-height:50px; padding:0 16px; }
   button { cursor:pointer; -webkit-user-select:none; user-select:none; }
   button:active { background:var(--line); }
-  button.acc, .seg button.on { background:var(--acc); color:#111; border-color:var(--acc); font-weight:700; }
+  button.acc, .seg button.on, .grid2 button.on, button.tog.on { background:var(--acc); color:#111; border-color:var(--acc); font-weight:700; }
   button.big { width:100%; min-height:68px; font-size:24px; font-weight:800; border:0; }
   /* „Teams bilden“ bleibt auch bei langen Listen unten sichtbar */
   #go { position:sticky; bottom:calc(10px + env(safe-area-inset-bottom)); z-index:5; box-shadow:0 6px 24px #000; }
@@ -41,11 +41,12 @@
   input[type=text] { width:100%; }
   .seg { display:flex; gap:0; } .seg button { border-radius:0; flex:1; }
   .seg button:first-child { border-radius:12px 0 0 12px; } .seg button:last-child { border-radius:0 12px 12px 0; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .grid2 button { min-height:56px; padding:0 8px; font-size:16px; }
   .num { min-width:70px; text-align:center; font-size:34px; font-weight:800; font-variant-numeric:tabular-nums; }
   .hint { color:var(--mut); font-size:14px; line-height:1.45; margin:8px 0 0; }
-  .switch { display:flex; align-items:center; gap:12px; min-height:50px; font-size:17px; cursor:pointer; }
-  .switch input { width:28px; height:28px; accent-color:var(--acc); }
   .count { font-weight:700; } .count b { color:var(--acc); }
+  .empty { color:var(--mut); padding:12px 0; }
 
   /* Klassenliste */
   #list { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:8px; margin-top:10px; }
@@ -55,39 +56,48 @@
   .st .nm::before { content:"✓"; color:#86efac; font-weight:800; margin-right:10px; }
   .st.abs { opacity:.5; } .st.abs .nm { text-decoration:line-through; } .st.abs .nm::before { content:"✗"; color:#fca5a5; }
   .st .lv { border:0; border-left:1px solid var(--line); border-radius:0; background:none; padding:0 10px;
-    font-size:13px; letter-spacing:1px; color:var(--acc); display:flex; align-items:center; gap:8px; white-space:nowrap; }
-  .st .lv .g { font-size:15px; font-weight:800; letter-spacing:0; color:var(--fg); min-width:1.1em; }
+    font-size:12px; letter-spacing:1px; color:var(--acc); display:flex; align-items:center; gap:6px; white-space:nowrap; }
+  .st .lv .g { font-size:15px; font-weight:800; letter-spacing:0; color:var(--fg); min-width:1em; }
+  .st .lv .x { font-size:14px; letter-spacing:0; }
   .st .lv .none { color:#52525b; }
-  body:not(.balance):not(.gender) .st .lv { display:none; }
-  body:not(.balance) .st .lv .dots, body:not(.gender) .st .lv .g { display:none; }
 
-  /* Eingabe Stärke / Geschlecht */
+  /* Eingabe-Leiste je Person */
   #pick { position:fixed; left:0; right:0; bottom:0; z-index:25; background:#111113; border-top:2px solid var(--acc);
     border-radius:18px 18px 0 0; padding:14px calc(14px + env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left));
-    transform:translateY(110%); visibility:hidden; transition:transform .2s, visibility 0s .2s; box-shadow:0 -10px 30px #000; }
+    transform:translateY(110%); visibility:hidden; transition:transform .2s, visibility 0s .2s; box-shadow:0 -10px 30px #000;
+    max-height:92vh; overflow:auto; }
   #pick.open { transform:none; visibility:visible; transition:transform .2s; }
   #pick .in { max-width:640px; margin:0 auto; display:flex; flex-direction:column; gap:10px; }
   #pickName { font-size:24px; font-weight:800; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #pick .lbl { color:var(--mut); font-size:14px; margin-bottom:-4px; }
   #pick .seg button { padding:0 4px; font-size:18px; }
-  body:not(.balance) #pick .forBal, body:not(.gender) #pick .forGen { display:none; }
-  .empty { color:var(--mut); padding:12px 0; }
+  #apartBox { display:none; flex-wrap:wrap; gap:6px; max-height:28vh; overflow:auto; padding:2px; }
+  #apartBox.open { display:flex; }
+  #apartBox button { min-height:42px; font-size:15px; padding:0 12px; }
+  #apartBox button.on { background:#7f1d1d; border-color:#ef4444; color:#fff; font-weight:700; }
 
   /* Ergebnis */
-  #result { position:fixed; inset:0; background:#000; z-index:20; display:none; flex-direction:column;
+  .full { position:fixed; inset:0; background:#000; z-index:20; display:none; flex-direction:column;
     padding:calc(10px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right))
     calc(10px + env(safe-area-inset-bottom)) calc(10px + env(safe-area-inset-left)); }
-  body.show #result { display:flex; } body.show { overflow:hidden; }
+  .full.open { display:flex; } body.lock { overflow:hidden; }
   #teams { flex:1; display:grid; gap:10px; min-height:0; }
   .team { border-radius:16px; background:var(--card); border:3px solid var(--c); display:flex; flex-direction:column; min-height:0; overflow:hidden; }
-  .team h3 { margin:0; background:var(--c); color:var(--t); padding:.25em .5em; font-size:1.1em; display:flex; justify-content:space-between; gap:.5em; }
+  .team h3 { margin:0; background:var(--c); color:var(--t); padding:.25em .5em; font-size:1.1em; display:flex; justify-content:space-between; gap:.5em; white-space:nowrap; }
   .team h3 small { font-weight:600; opacity:.8; }
   .team ul { list-style:none; margin:0; padding:.25em .5em; flex:1; overflow:hidden; }
   .team li { padding:.12em .3em; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:8px; cursor:pointer; }
   .team li.sel { background:var(--acc); color:#111; }
-  #rbar { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
-  #rbar button { flex:1; min-height:56px; font-size:18px; font-weight:700; }
-  #rhint { width:100%; text-align:center; color:var(--mut); font-size:14px; }
+  .bar { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  .bar button { flex:1; min-height:56px; font-size:18px; font-weight:700; }
+  .bar .tip { width:100%; text-align:center; color:var(--mut); font-size:14px; }
+  #warn { width:100%; text-align:center; color:#fca5a5; font-size:14px; font-weight:600; }
+  #warn:empty { display:none; }
+
+  /* Name ziehen */
+  #drawName { flex:1; display:flex; align-items:center; justify-content:center; text-align:center; font-weight:800;
+    color:var(--acc); font-size:min(18vw,160px); line-height:1.05; overflow-wrap:anywhere; padding:0 10px; }
+  #drawInfo { text-align:center; color:var(--mut); font-size:16px; }
 
   /* Bearbeiten-Dialog */
   #dlg { position:fixed; inset:0; background:rgba(0,0,0,.8); z-index:30; display:none; align-items:flex-start; justify-content:center;
@@ -96,6 +106,7 @@
   #dlg .box { width:100%; max-width:640px; }
   #offline { font-size:13px; color:var(--mut); text-align:center; margin-top:8px; }
   #offline.ok { color:#86efac; }
+  #msg { text-align:center; color:#86efac; font-weight:600; min-height:1.2em; margin-top:8px; }
   footer { color:var(--mut); font-size:13px; text-align:center; line-height:1.5; }
   @media (prefers-reduced-motion: no-preference) { .team { animation:pop .25s ease-out both; } }
   @keyframes pop { from { transform:scale(.96); opacity:0; } }
@@ -112,19 +123,27 @@
       <button id="newCls" class="small">+ Neu</button>
     </div>
     <div class="row" style="margin-top:8px">
-      <button id="editBtn" class="small">✎ Namen bearbeiten</button>
-      <button id="allIn" class="small">Alle anwesend</button>
+      <button id="editBtn" class="small">✎ Namen</button>
+      <button id="allIn" class="small">Alle da</button>
+      <button id="drawBtn" class="small">🎲 Name ziehen</button>
       <span class="grow"></span>
       <span class="count" id="count"></span>
     </div>
-    <p class="hint">Antippen = abwesend/anwesend.</p>
+    <p class="hint">Name antippen = abwesend. Rechts daneben: Stärke, M/J, Torwart, „Nie zusammen“.</p>
     <div id="list"></div>
   </section>
 
   <section class="box">
-    <h2>Einteilung</h2>
-    <div class="seg" role="group" aria-label="Art der Einteilung">
-      <button id="byCount" class="on">Anzahl Teams</button>
+    <h2>Wie einteilen?</h2>
+    <div class="grid2" role="group" aria-label="Art der Einteilung">
+      <button data-kind="fair">⚖️ Fair gemischt</button>
+      <button data-kind="level">📶 Leistungsgruppen</button>
+      <button data-kind="split">M | J getrennt</button>
+      <button data-kind="random">🎲 Zufall</button>
+    </div>
+    <p class="hint" id="kindHint"></p>
+    <div class="seg" role="group" aria-label="Anzahl oder Größe" style="margin-top:14px">
+      <button id="byCount">Anzahl Teams</button>
       <button id="bySize">Teamgröße</button>
     </div>
     <div class="row" style="justify-content:center;margin-top:12px">
@@ -133,38 +152,63 @@
       <button class="round" id="plus" aria-label="mehr">+</button>
     </div>
     <p class="hint" id="preview" style="text-align:center"></p>
-    <label class="switch"><input type="checkbox" id="balance"> Stärken ausgleichen</label>
-    <label class="switch"><input type="checkbox" id="gender"> Mädchen und Jungen ausgleichen</label>
-    <p class="hint" id="balHint">Tippe rechts neben einem Namen, um Stärke (1 schwächer bis 5 stärker) und M/J einzutragen. Mit „Weiter ›“ geht es schnell durch die ganze Liste. Ohne Angabe zählt Stärke 3. Im Ergebnis ist davon nichts zu sehen.</p>
   </section>
 
   <button class="big acc" id="go">Teams bilden</button>
-  <div id="pick" role="dialog" aria-label="Stärke und Geschlecht eintragen">
-    <div class="in">
-      <div id="pickName"></div>
-      <div class="lbl forBal">Stärke</div>
-      <div class="seg forBal" id="pickLv"></div>
-      <div class="lbl forGen">Geschlecht</div>
-      <div class="seg forGen" id="pickG"></div>
-      <div class="row">
-        <button id="pickPrev" class="round" aria-label="vorheriger Name">‹</button>
-        <button id="pickNext" class="acc grow">Weiter ›</button>
-        <button id="pickDone">Fertig</button>
-      </div>
+
+  <section class="box" style="margin-top:14px">
+    <h2>Handy ↔ iPad</h2>
+    <div class="row">
+      <button id="exportBtn" class="small grow">⬇ Klassen als Datei sichern</button>
+      <button id="importBtn" class="small grow">⬆ Datei laden</button>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
     </div>
-  </div>
+    <p class="hint">Die Datei kannst du z. B. per AirDrop, USB oder Schul-Cloud auf das andere Gerät bringen und dort laden.</p>
+    <div id="msg" role="status"></div>
+  </section>
+
   <div id="offline"></div>
   <footer>
     <p>Alle Namen bleiben nur auf diesem Gerät gespeichert. Kein Konto, keine Datenübertragung, kein Tracking.</p>
   </footer>
 </div>
 
-<div id="result" aria-live="polite">
+<div id="pick" role="dialog" aria-label="Angaben zur Person">
+  <div class="in">
+    <div id="pickName"></div>
+    <div class="lbl">Stärke (1 schwächer – 5 stärker)</div>
+    <div class="seg" id="pickLv"></div>
+    <div class="lbl">Geschlecht</div>
+    <div class="seg" id="pickG"></div>
+    <div class="row">
+      <button id="pickTw" class="tog grow">🧤 Torwart</button>
+      <button id="pickApart" class="grow">⛔ Nie zusammen mit …</button>
+    </div>
+    <div id="apartBox"></div>
+    <div class="row">
+      <button id="pickPrev" class="round" aria-label="vorheriger Name">‹</button>
+      <button id="pickNext" class="acc grow">Weiter ›</button>
+      <button id="pickDone">Fertig</button>
+    </div>
+  </div>
+</div>
+
+<div id="result" class="full" aria-live="polite">
   <div id="teams"></div>
-  <div id="rbar">
-    <div id="rhint">Tipp: zwei Namen nacheinander antippen, um sie zu tauschen.</div>
+  <div class="bar">
+    <div id="warn"></div>
+    <div class="tip">Tipp: zwei Namen nacheinander antippen, um sie zu tauschen.</div>
     <button id="again" class="acc">🔀 Neu mischen</button>
     <button id="back">‹ Zurück</button>
+  </div>
+</div>
+
+<div id="draw" class="full" aria-live="polite">
+  <div id="drawName"></div>
+  <div id="drawInfo"></div>
+  <div class="bar">
+    <button id="drawNext" class="acc">🎲 Nächster</button>
+    <button id="drawBack">‹ Zurück</button>
   </div>
 </div>
 
@@ -189,7 +233,7 @@
 (() => {
   const $ = id => document.getElementById(id);
   const KEY = 'teams-generator-v1';
-  // Leibchenfarben: Hintergrund, Schriftfarbe
+  // Leibchenfarben: Name, Hintergrund, Schriftfarbe
   const COLORS = [
     ['Orange','#ffb020','#111'], ['Blau','#3b82f6','#fff'], ['Grün','#22c55e','#111'], ['Rot','#ef4444','#fff'],
     ['Gelb','#fde047','#111'], ['Lila','#a855f7','#fff'], ['Weiß','#f4f4f5','#111'], ['Pink','#ec4899','#fff'],
@@ -197,23 +241,38 @@
   ];
   const MAXT = COLORS.length;
   const G_SHORT = { w:'M', m:'J', '':'–' }, G_LONG = { w:'Mädchen', m:'Junge', '':'ohne Angabe' };
+  const KIND_HINT = {
+    fair: 'Stärke, Mädchen/Jungen und Torwart werden gleichmäßig auf alle Teams verteilt.',
+    level: 'Die Stärkeren spielen in Feld 1, die Schwächeren in Feld 2. Innerhalb jedes Feldes sind die Teams ausgeglichen. Am besten 4, 6 oder 8 Teams.',
+    split: 'Eigene Mädchen-Teams und Jungen-Teams, jeweils ausgeglichen. Personen ohne Angabe kommen dorthin, wo weniger sind.',
+    random: 'Reiner Zufall. Nur „Nie zusammen“ wird beachtet.'
+  };
 
+  // ---------- Speicher ----------
   let S;
   function load() {
     try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) { S = null; }
-    if (!S || !Array.isArray(S.classes)) S = { ver:2, classes:[], cur:null, mode:'count', count:2, size:5, balance:false, gender:false };
-    if (S.ver !== 2) { // v1 hatte 3 Stufen: auf 5 umrechnen (1→1, 2→3, 3→5)
-      S.classes.forEach(c => c.st.forEach(s => { if (s.lv) s.lv = s.lv * 2 - 1; s.g = s.g || ''; }));
-      S.ver = 2; S.gender = false;
-    }
+    if (!S || !Array.isArray(S.classes)) S = { ver:3, classes:[], cur:null, mode:'count', count:2, size:5, kind:'fair' };
+    if (!S.ver) S.classes.forEach(c => c.st.forEach(s => { if (s.lv) s.lv = s.lv * 2 - 1; })); // v1: 3 Stufen → 5
+    if ((S.ver || 1) < 3) { S.kind = 'fair'; delete S.balance; delete S.gender; S.ver = 3; }
+    S.classes.forEach(fixClass);
     if (!S.classes.length) { const c = newClass('Meine Klasse'); S.cur = c.id; }
     if (!cur()) S.cur = S.classes[0].id;
+    if (!KIND_HINT[S.kind]) S.kind = 'fair';
     save();
   }
+  function fixClass(c) {
+    c.st = (c.st || []).filter(s => s && s.n).map(s => ({ n:String(s.n), lv:+s.lv || 0, g:s.g === 'w' || s.g === 'm' ? s.g : '', tw:!!s.tw, abs:!!s.abs }));
+    const names = new Set(c.st.map(s => s.n));
+    c.apart = (c.apart || []).filter(p => Array.isArray(p) && names.has(p[0]) && names.has(p[1]) && p[0] !== p[1]);
+    return c;
+  }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
-  function newClass(name) { const c = { id:Date.now().toString(36)+Math.random().toString(36).slice(2,6), name, st:[] }; S.classes.push(c); return c; }
+  function newClass(name) { const c = { id:Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, st:[], apart:[] }; S.classes.push(c); return c; }
   const cur = () => S.classes.find(c => c.id === S.cur);
   const present = () => cur().st.filter(s => !s.abs);
+  const isApart = (a, b) => cur().apart.some(p => (p[0] === a && p[1] === b) || (p[0] === b && p[1] === a));
+  const apartCount = n => cur().apart.filter(p => p[0] === n || p[1] === n).length;
 
   function teamCount(n) {
     if (S.mode === 'count') return Math.max(1, Math.min(S.count, n || S.count, MAXT));
@@ -226,91 +285,137 @@
     return k + (k === 1 ? ' Team' : ' Teams') + ' mit ' + (lo === hi ? lo : lo + '–' + hi) + ' Personen';
   }
 
-  // ---------- Anzeige Startseite ----------
+  // ---------- Startseite ----------
   function render() {
-    document.body.classList.toggle('balance', !!S.balance);
-    document.body.classList.toggle('gender', !!S.gender);
-    $('balance').checked = !!S.balance;
-    $('gender').checked = !!S.gender;
-    $('balHint').style.display = S.balance || S.gender ? '' : 'none';
     const sel = $('cls'); sel.innerHTML = '';
     S.classes.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; sel.appendChild(o); });
     sel.value = S.cur;
     const c = cur(), list = $('list'); list.innerHTML = '';
-    if (!c.st.length) list.innerHTML = '<div class="empty">Noch keine Namen. Tippe auf „✎ Namen bearbeiten“.</div>';
+    if (!c.st.length) list.innerHTML = '<div class="empty">Noch keine Namen. Tippe auf „✎ Namen“.</div>';
     c.st.forEach((s, i) => {
       const d = document.createElement('div'); d.className = 'st' + (s.abs ? ' abs' : '');
       const nm = document.createElement('button'); nm.className = 'nm'; nm.textContent = s.n;
       nm.setAttribute('aria-label', s.n + (s.abs ? ', abwesend' : ', anwesend'));
       nm.onclick = () => { s.abs = !s.abs; save(); render(); };
       const lv = document.createElement('button'); lv.className = 'lv';
-      lv.innerHTML = '<span class="g"></span><span class="dots"></span>';
-      lv.firstChild.textContent = G_SHORT[s.g || ''];
-      lv.firstChild.classList.toggle('none', !s.g);
-      lv.lastChild.textContent = s.lv ? '●'.repeat(s.lv) + '○'.repeat(5 - s.lv) : '○○○○○';
-      lv.lastChild.classList.toggle('none', !s.lv);
-      lv.setAttribute('aria-label', s.n + ': Stärke ' + (s.lv || 'ohne Angabe') + ', ' + G_LONG[s.g || '']);
+      const ac = apartCount(s.n);
+      lv.innerHTML = '<span class="g"></span><span class="dots"></span><span class="x"></span>';
+      lv.children[0].textContent = G_SHORT[s.g]; lv.children[0].classList.toggle('none', !s.g);
+      lv.children[1].textContent = s.lv ? '●'.repeat(s.lv) + '○'.repeat(5 - s.lv) : '○○○○○';
+      lv.children[1].classList.toggle('none', !s.lv);
+      lv.children[2].textContent = (s.tw ? '🧤' : '') + (ac ? '⛔' : '');
+      lv.setAttribute('aria-label', s.n + ': Stärke ' + (s.lv || 'ohne Angabe') + ', ' + G_LONG[s.g] + (s.tw ? ', Torwart' : '') + (ac ? ', nie zusammen mit ' + ac : ''));
       lv.onclick = () => openPick(i);
       d.append(nm, lv); list.appendChild(d);
     });
-    const n = present().length;
-    let txt = '<b>' + n + '</b> von ' + c.st.length + ' da';
-    if (S.gender) {
-      const w = present().filter(s => s.g === 'w').length, m = present().filter(s => s.g === 'm').length;
-      txt += ' · ' + w + ' M · ' + m + ' J' + (n - w - m ? ' · ' + (n - w - m) + ' o. A.' : '');
-    }
-    $('count').innerHTML = txt;
+    const pr = present(), n = pr.length;
+    const w = pr.filter(s => s.g === 'w').length, m = pr.filter(s => s.g === 'm').length;
+    $('count').innerHTML = '<b>' + n + '</b> von ' + c.st.length + ' da' + (w || m ? ' · ' + w + ' M · ' + m + ' J' : '');
+    document.querySelectorAll('[data-kind]').forEach(b => b.classList.toggle('on', b.dataset.kind === S.kind));
+    $('kindHint').textContent = KIND_HINT[S.kind];
     $('byCount').classList.toggle('on', S.mode === 'count');
     $('bySize').classList.toggle('on', S.mode === 'size');
     $('val').textContent = S.mode === 'count' ? S.count : S.size;
     $('preview').textContent = n ? sizesText(n, teamCount(n)) : '';
-    $('go').disabled = n < 2;
-    $('go').style.opacity = n < 2 ? .4 : 1;
+    $('go').disabled = n < 2; $('go').style.opacity = n < 2 ? .4 : 1;
+    $('drawBtn').disabled = n < 1;
   }
 
   // ---------- Verteilung ----------
   const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-  let lastKey = '';
-  function makeTeams() {
-    const pl = present(), n = pl.length, k = Math.min(teamCount(n), n);
-    // feste Größen: Unterschied höchstens 1, welche Teams größer sind, ist zufällig
-    const cap = shuffle(Array.from({ length:k }, (_, i) => Math.floor(n / k) + (i < n % k ? 1 : 0)));
-    let best = null;
-    // mehrere Versuche: vermeidet, dass genau dieselbe Einteilung wie eben herauskommt
-    for (let t = 0; t < 8; t++) {
-      const teams = Array.from({ length:k }, () => ({ m:[], sum:0, g:{ w:0, m:0, '':0 } }));
-      let order = shuffle(pl.slice());
-      if (S.balance) order.sort((a, b) => (b.lv || 3) - (a.lv || 3)); // stabil: innerhalb einer Stufe zufällig
-      if (S.gender) { // seltenere Gruppe zuerst verteilen, damit sie überall gleich oft vorkommt
-        const cnt = g => order.filter(p => (p.g || '') === g).length;
-        const rank = { w:cnt('w'), m:cnt('m'), '':1e9 };
-        order.sort((a, b) => rank[a.g || ''] - rank[b.g || '']);
-      }
-      for (const p of order) {
-        const v = S.balance ? (p.lv || 3) : 0, g = p.g || '';
-        let cand = teams.map((tm, i) => i).filter(i => teams[i].m.length < cap[i]);
-        if (S.gender && g) { // zuerst: Team mit den wenigsten dieses Geschlechts
-          const min = Math.min(...cand.map(i => teams[i].g[g]));
-          cand = cand.filter(i => teams[i].g[g] === min);
-        }
-        if (S.balance) {
-          const min = Math.min(...cand.map(i => teams[i].sum));
-          cand = cand.filter(i => teams[i].sum === min);
-          // bei gleicher Summe: Team mit mehr freien Plätzen bevorzugen
-          const free = Math.max(...cand.map(i => cap[i] - teams[i].m.length));
-          cand = cand.filter(i => cap[i] - teams[i].m.length === free);
-        } else {
-          const fill = Math.min(...cand.map(i => teams[i].m.length / cap[i]));
-          cand = cand.filter(i => teams[i].m.length / cap[i] === fill);
-        }
-        const i = cand[Math.floor(Math.random() * cand.length)];
-        teams[i].m.push(p.n); teams[i].sum += v; teams[i].g[g]++;
-      }
-      const key = teams.map(tm => tm.m.slice().sort().join(',')).sort().join('|');
-      best = teams;
-      if (key !== lastKey) { lastKey = key; break; }
+  const pickOne = a => a[Math.floor(Math.random() * a.length)];
+  const caps = (n, k) => shuffle(Array.from({ length:k }, (_, i) => Math.floor(n / k) + (i < n % k ? 1 : 0)));
+
+  // Verteilt Personen auf Teams mit festen Größen (cap). fair=true gleicht Torwart, M/J und Stärke aus.
+  function distribute(pl, cap, fair) {
+    const teams = cap.map(() => ({ m:[], sum:0, tw:0, g:{ w:0, m:0, '':0 } }));
+    let order = shuffle(pl.slice());
+    if (fair) {
+      const cnt = g => order.filter(p => p.g === g).length, rank = { w:cnt('w'), m:cnt('m'), '':1e9 };
+      order.sort((a, b) => (b.lv || 3) - (a.lv || 3));    // Stärkere zuerst
+      order.sort((a, b) => rank[a.g] - rank[b.g]);         // seltenere Gruppe zuerst
+      order.sort((a, b) => b.tw - a.tw);                   // Torleute ganz zuerst
     }
-    return best.map(tm => tm.m);
+    let bad = 0;
+    for (const p of order) {
+      let cand = teams.map((t, i) => i).filter(i => teams[i].m.length < cap[i]);
+      const ok = cand.filter(i => !teams[i].m.some(q => isApart(p.n, q.n)));
+      if (ok.length) cand = ok; else bad++;
+      const keep = f => { const v = Math.min(...cand.map(f)); cand = cand.filter(i => f(i) === v); };
+      if (fair) {
+        if (p.tw) keep(i => teams[i].tw);
+        if (p.g) keep(i => teams[i].g[p.g]);
+        keep(i => teams[i].sum);
+        keep(i => teams[i].m.length - cap[i]); // mehr freie Plätze zuerst
+      } else keep(i => teams[i].m.length / cap[i]);
+      const t = teams[pickOne(cand)];
+      t.m.push(p); t.sum += p.lv || 3; t.tw += p.tw ? 1 : 0; t.g[p.g]++;
+    }
+    if (fair) polish(teams);
+    return { teams:teams.map(t => t.m), bad };
+  }
+  // Feinschliff: Tausche Personen mit gleichem Geschlecht und gleicher Torwart-Rolle,
+  // wenn dadurch die Stärke-Summen näher zusammenrücken und „Nie zusammen“ nicht verletzt wird.
+  function polish(teams) {
+    const v = p => p.lv || 3;
+    const fits = (p, t, out) => !t.m.some(q => q !== out && isApart(p.n, q.n));
+    for (let round = 0, better = true; better && round < 50; round++) {
+      better = false;
+      for (let a = 0; a < teams.length; a++) for (let b = a + 1; b < teams.length; b++) {
+        const A = teams[a], B = teams[b];
+        for (let i = 0; i < A.m.length; i++) for (let j = 0; j < B.m.length; j++) {
+          const p = A.m[i], q = B.m[j], d = v(p) - v(q);
+          if (!d || p.g !== q.g || p.tw !== q.tw) continue;
+          const before = Math.abs(A.sum - B.sum), after = Math.abs(A.sum - 2 * d - B.sum);
+          if (after >= before || !fits(q, A, p) || !fits(p, B, q)) continue;
+          A.m[i] = q; B.m[j] = p; A.sum -= d; B.sum += d; better = true;
+        }
+      }
+    }
+  }
+
+  // Teilt Personen in Felder (Gruppen von Teams) auf; jedes Feld wird für sich verteilt.
+  function fields() {
+    const pl = present(), n = pl.length, k = Math.min(teamCount(n), n);
+    if (S.kind === 'level' && k >= 2) {
+      const k1 = Math.ceil(k / 2), n1 = Math.round(n * k1 / k);
+      const sorted = shuffle(pl.slice()).sort((a, b) => (b.lv || 3) - (a.lv || 3));
+      return [{ label:'Feld 1', pl:sorted.slice(0, n1), k:k1 }, { label:'Feld 2', pl:sorted.slice(n1), k:k - k1 }];
+    }
+    if (S.kind === 'split' && k >= 2) {
+      const W = pl.filter(p => p.g === 'w'), M = pl.filter(p => p.g === 'm'), O = shuffle(pl.filter(p => !p.g));
+      if (W.length && M.length) {
+        let kw = Math.round(k * W.length / (W.length + M.length));
+        kw = Math.max(1, Math.min(k - 1, kw));
+        const fw = { label:'Mädchen', pl:W, k:kw }, fm = { label:'Jungen', pl:M, k:k - kw };
+        O.forEach(p => (fw.pl.length / fw.k <= fm.pl.length / fm.k ? fw : fm).pl.push(p));
+        return [fw, fm].filter(f => f.pl.length);
+      }
+    }
+    return [{ label:'', pl, k }];
+  }
+
+  let lastKey = '', lastBad = 0;
+  function makeTeams() {
+    let best = null;
+    // mehrere Versuche, der beste gewinnt: „Nie zusammen“ einhalten, Stärke möglichst gleich, nicht dieselbe Einteilung wie eben
+    const fair = S.kind !== 'random';
+    for (let t = 0; t < (fair ? 40 : 15); t++) {
+      const out = []; let bad = 0, spread = 0;
+      fields().forEach((f, fi) => {
+        const r = distribute(f.pl, caps(f.pl.length, Math.min(f.k, f.pl.length)), fair);
+        bad += r.bad;
+        const sums = r.teams.map(m => m.reduce((a, p) => a + (p.lv || 3), 0));
+        if (fair && sums.length) spread += Math.max(...sums) - Math.min(...sums);
+        r.teams.forEach(m => out.push({ m:m.map(p => p.n), f:f.label, fi }));
+      });
+      const key = out.map(t => t.m.slice().sort().join(',')).sort().join('|');
+      const score = bad * 1000 + spread * 10 + (key === lastKey ? 15 : 0);
+      if (!best || score < best.score) best = { out, score, key, bad };
+      if (!fair && score === 0) break;
+    }
+    lastKey = best.key; lastBad = best.bad;
+    return best.out;
   }
 
   // ---------- Ergebnis ----------
@@ -325,14 +430,16 @@
     box.style.gridTemplateColumns = 'repeat(' + cols + ',minmax(0,1fr))';
     box.style.gridTemplateRows = 'repeat(' + Math.ceil(k / cols) + ',minmax(0,1fr))';
     box.innerHTML = '';
-    result.forEach((m, ti) => {
-      const [name, c, t] = COLORS[ti];
+    const showField = result.some(t => t.f) && S.kind === 'level';
+    result.forEach((t, ti) => {
+      const [name, c, tc] = COLORS[ti];
       const d = document.createElement('div'); d.className = 'team';
-      d.style.setProperty('--c', c); d.style.setProperty('--t', t);
+      d.style.setProperty('--c', c); d.style.setProperty('--t', tc);
       const h = document.createElement('h3'); h.innerHTML = '<span></span><small></small>';
-      h.firstChild.textContent = 'Team ' + name; h.lastChild.textContent = m.length;
+      h.firstChild.textContent = 'Team ' + name;
+      h.lastChild.textContent = (showField ? t.f + ' · ' : '') + t.m.length;
       const ul = document.createElement('ul');
-      m.forEach((nm, pi) => {
+      t.m.forEach((nm, pi) => {
         const li = document.createElement('li'); li.textContent = nm;
         if (sel && sel[0] === ti && sel[1] === pi) li.className = 'sel';
         li.onclick = () => tap(ti, pi);
@@ -340,14 +447,16 @@
       });
       d.append(h, ul); box.appendChild(d);
     });
+    $('warn').textContent = lastBad ? '„Nie zusammen“ ließ sich nicht ganz einhalten – bitte prüfen oder tauschen.' : '';
     fit();
   }
   // Schrift so groß wie möglich, ohne dass Namen abgeschnitten werden
   function fit() {
     const box = $('teams'), teams = [...box.children];
     let lo = 12, hi = 96;
-    const ok = () => teams.every(t => { const ul = t.querySelector('ul');
-      return ul.scrollHeight <= ul.clientHeight + 1 && [...ul.children].every(li => li.scrollWidth <= li.clientWidth + 1); });
+    const ok = () => teams.every(t => { const ul = t.querySelector('ul'), h = t.querySelector('h3');
+      return ul.scrollHeight <= ul.clientHeight + 1 && h.scrollWidth <= h.clientWidth + 1 &&
+        [...ul.children].every(li => li.scrollWidth <= li.clientWidth + 1); });
     while (hi - lo > 1) {
       const mid = (lo + hi) >> 1; box.style.fontSize = mid + 'px';
       if (ok()) lo = mid; else hi = mid;
@@ -357,19 +466,76 @@
   function tap(ti, pi) {
     if (!sel) sel = [ti, pi];
     else if (sel[0] === ti && sel[1] === pi) sel = null;
-    else { const a = result[sel[0]], b = result[ti]; [a[sel[1]], b[pi]] = [b[pi], a[sel[1]]]; sel = null; }
+    else { const a = result[sel[0]].m, b = result[ti].m; [a[sel[1]], b[pi]] = [b[pi], a[sel[1]]]; sel = null; }
     showResult();
   }
+  function openFull(id) { $(id).classList.add('open'); document.body.classList.add('lock'); }
+  function closeFull() { document.querySelectorAll('.full').forEach(f => f.classList.remove('open')); document.body.classList.remove('lock'); render(); }
   function go() {
     if (present().length < 2) return;
     result = makeTeams(); sel = null;
-    document.body.classList.add('show'); showResult();
+    openFull('result'); showResult();
   }
 
-  // ---------- Bearbeiten ----------
+  // ---------- Name ziehen (ohne Wiederholung, bis alle dran waren) ----------
+  let drawn = new Set(), drawCls = null;
+  function drawNext() {
+    const pr = present().map(s => s.n);
+    if (drawCls !== S.cur) { drawn = new Set(); drawCls = S.cur; }
+    let pool = pr.filter(n => !drawn.has(n)), info = '';
+    if (!pool.length) { drawn = new Set(); pool = pr; info = 'Alle waren dran – neue Runde. '; }
+    const n = pickOne(pool); drawn.add(n);
+    $('drawName').textContent = n;
+    $('drawInfo').textContent = info + drawn.size + ' von ' + pr.length + ' gezogen';
+  }
+
+  // ---------- Angaben je Person ----------
+  let pi = -1;
+  function openPick(i) { pi = i; $('apartBox').classList.remove('open'); drawPick(); $('pick').classList.add('open'); }
+  function closePick() { pi = -1; $('pick').classList.remove('open'); }
+  function drawPick() {
+    const c = cur(), s = c.st[pi]; if (!s) return closePick();
+    $('pickName').textContent = s.n;
+    const lvBox = $('pickLv'); lvBox.innerHTML = '';
+    [['–',0],['1',1],['2',2],['3',3],['4',4],['5',5]].forEach(([t, v]) => {
+      const b = document.createElement('button'); b.textContent = t; b.classList.toggle('on', s.lv === v);
+      b.setAttribute('aria-label', v ? 'Stärke ' + v : 'Stärke ohne Angabe');
+      b.onclick = () => { s.lv = v; save(); render(); drawPick(); };
+      lvBox.appendChild(b);
+    });
+    const gBox = $('pickG'); gBox.innerHTML = '';
+    [['Mädchen','w'],['Junge','m'],['o. A.','']].forEach(([t, v]) => {
+      const b = document.createElement('button'); b.textContent = t; b.classList.toggle('on', s.g === v);
+      b.onclick = () => { s.g = v; save(); render(); drawPick(); };
+      gBox.appendChild(b);
+    });
+    $('pickTw').classList.toggle('on', s.tw);
+    const ac = apartCount(s.n);
+    $('pickApart').textContent = '⛔ Nie zusammen mit …' + (ac ? ' (' + ac + ')' : '');
+    const ab = $('apartBox'); ab.innerHTML = '';
+    c.st.forEach(o => {
+      if (o.n === s.n) return;
+      const b = document.createElement('button'); b.textContent = o.n; b.classList.toggle('on', isApart(s.n, o.n));
+      b.onclick = () => {
+        if (isApart(s.n, o.n)) c.apart = c.apart.filter(p => !((p[0] === s.n && p[1] === o.n) || (p[0] === o.n && p[1] === s.n)));
+        else c.apart.push([s.n, o.n]);
+        save(); render(); drawPick();
+      };
+      ab.appendChild(b);
+    });
+    $('pickPrev').disabled = pi === 0; $('pickPrev').style.opacity = pi === 0 ? .4 : 1;
+    $('pickNext').textContent = pi >= c.st.length - 1 ? 'Fertig ✓' : 'Weiter ›';
+  }
+  $('pickTw').onclick = () => { const s = cur().st[pi]; s.tw = !s.tw; save(); render(); drawPick(); };
+  $('pickApart').onclick = () => $('apartBox').classList.toggle('open');
+  $('pickPrev').onclick = () => { if (pi > 0) { pi--; $('apartBox').classList.remove('open'); drawPick(); } };
+  $('pickNext').onclick = () => { if (pi < cur().st.length - 1) { pi++; $('apartBox').classList.remove('open'); drawPick(); } else closePick(); };
+  $('pickDone').onclick = closePick;
+
+  // ---------- Namen bearbeiten ----------
   let editingNew = false;
   function openEdit(isNew) {
-    editingNew = isNew;
+    closePick(); editingNew = isNew;
     $('dlgTitle').textContent = isNew ? 'Neue Klasse' : 'Namen bearbeiten';
     $('clsName').value = isNew ? '' : cur().name;
     $('names').value = isNew ? '' : cur().st.map(s => s.n).join('\n');
@@ -382,46 +548,56 @@
     let c;
     if (editingNew) { c = newClass('Klasse'); S.cur = c.id; } else c = cur();
     c.name = $('clsName').value.trim() || c.name || 'Klasse';
-    const old = new Map(c.st.map(s => [s.n, s]));
-    const seen = new Set();
-    c.st = names.filter(n => !seen.has(n) && seen.add(n)).map(n => old.get(n) || { n, lv:0, g:'', abs:false });
-    save(); closeEdit(); render();
+    const old = new Map(c.st.map(s => [s.n, s])), seen = new Set();
+    c.st = names.filter(n => !seen.has(n) && seen.add(n)).map(n => old.get(n) || { n, lv:0, g:'', tw:false, abs:false });
+    fixClass(c); save(); closeEdit(); render();
   }
   function closeEdit() { $('dlg').classList.remove('open'); }
 
-  // ---------- Stärke / Geschlecht eintragen ----------
-  let pi = -1;
-  function openPick(i) { pi = i; drawPick(); $('pick').classList.add('open'); }
-  function closePick() { pi = -1; $('pick').classList.remove('open'); }
-  function drawPick() {
-    const s = cur().st[pi]; if (!s) return closePick();
-    $('pickName').textContent = s.n;
-    const lvBox = $('pickLv'); lvBox.innerHTML = '';
-    [['–',0],['1',1],['2',2],['3',3],['4',4],['5',5]].forEach(([t, v]) => {
-      const b = document.createElement('button'); b.textContent = t; b.classList.toggle('on', (s.lv || 0) === v);
-      b.setAttribute('aria-label', v ? 'Stärke ' + v : 'Stärke ohne Angabe');
-      b.onclick = () => { s.lv = v; save(); render(); drawPick(); };
-      lvBox.appendChild(b);
-    });
-    const gBox = $('pickG'); gBox.innerHTML = '';
-    [['Mädchen','w'],['Junge','m'],['o. A.','']].forEach(([t, v]) => {
-      const b = document.createElement('button'); b.textContent = t; b.classList.toggle('on', (s.g || '') === v);
-      b.onclick = () => { s.g = v; save(); render(); drawPick(); };
-      gBox.appendChild(b);
-    });
-    $('pickPrev').disabled = pi === 0; $('pickPrev').style.opacity = pi === 0 ? .4 : 1;
-    $('pickNext').textContent = pi >= cur().st.length - 1 ? 'Fertig ✓' : 'Weiter ›';
-  }
-  $('pickPrev').onclick = () => { if (pi > 0) { pi--; drawPick(); } };
-  $('pickNext').onclick = () => { if (pi < cur().st.length - 1) { pi++; drawPick(); } else closePick(); };
-  $('pickDone').onclick = closePick;
+  // ---------- Datei sichern / laden ----------
+  function flash(t) { $('msg').textContent = t; setTimeout(() => { if ($('msg').textContent === t) $('msg').textContent = ''; }, 5000); }
+  $('exportBtn').onclick = () => {
+    const data = JSON.stringify({ app:'teams-generator', ver:3, saved:new Date().toISOString(), classes:S.classes }, null, 1);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([data], { type:'application/json' }));
+    a.download = 'teams-klassen-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    flash('✓ Datei gespeichert (' + S.classes.length + ' Klassen)');
+  };
+  $('importBtn').onclick = () => $('importFile').click();
+  $('importFile').onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const d = JSON.parse(r.result);
+        if (d.app !== 'teams-generator' || !Array.isArray(d.classes)) throw 0;
+        let added = 0, replaced = 0;
+        d.classes.forEach(c => {
+          if (!c || !c.name) return;
+          if (!d.ver) (c.st || []).forEach(s => { if (s.lv) s.lv = s.lv * 2 - 1; });
+          fixClass(c);
+          const ex = S.classes.find(x => x.name === c.name);
+          if (ex) { ex.st = c.st; ex.apart = c.apart; replaced++; }
+          else { c.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6); S.classes.push(c); added++; }
+        });
+        S.classes = S.classes.filter(c => c.st.length || S.classes.length === 1 || c.name !== 'Meine Klasse');
+        if (!cur()) S.cur = S.classes[0].id;
+        save(); render();
+        flash('✓ Geladen: ' + added + ' neu, ' + replaced + ' aktualisiert');
+      } catch (err) { flash('Diese Datei passt nicht zum Teams-Generator.'); }
+      e.target.value = '';
+    };
+    r.readAsText(f);
+  };
 
   // ---------- Bedienung ----------
-  $('gender').onchange = e => { S.gender = e.target.checked; save(); render(); };
   $('cls').onchange = e => { closePick(); S.cur = e.target.value; save(); render(); };
   $('newCls').onclick = () => openEdit(true);
   $('editBtn').onclick = () => openEdit(false);
   $('allIn').onclick = () => { cur().st.forEach(s => s.abs = false); save(); render(); };
+  document.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => { S.kind = b.dataset.kind; save(); render(); });
   $('byCount').onclick = () => { S.mode = 'count'; save(); render(); };
   $('bySize').onclick = () => { S.mode = 'size'; save(); render(); };
   const step = d => {
@@ -430,22 +606,25 @@
     save(); render();
   };
   $('minus').onclick = () => step(-1); $('plus').onclick = () => step(1);
-  $('balance').onchange = e => { S.balance = e.target.checked; save(); render(); };
-  $('go').onclick = go;
+  $('go').onclick = () => { closePick(); go(); };
   $('again').onclick = go;
-  $('back').onclick = () => { document.body.classList.remove('show'); render(); };
+  $('back').onclick = closeFull;
+  $('drawBtn').onclick = () => { closePick(); openFull('draw'); drawNext(); };
+  $('drawNext').onclick = drawNext;
+  $('drawBack').onclick = closeFull;
   $('save').onclick = saveEdit;
   $('cancel').onclick = closeEdit;
   $('delCls').onclick = () => {
     if (!confirm('Klasse „' + cur().name + '“ mit allen Namen löschen?')) return;
     S.classes = S.classes.filter(c => c.id !== S.cur); S.cur = S.classes[0].id; save(); closeEdit(); render();
   };
-  addEventListener('resize', () => { if (document.body.classList.contains('show')) showResult(); });
+  addEventListener('resize', () => { if ($('result').classList.contains('open')) showResult(); });
   addEventListener('keydown', e => {
     if ($('dlg').classList.contains('open')) { if (e.key === 'Escape') closeEdit(); return; }
     if (pi >= 0 && e.key === 'Escape') { closePick(); return; }
-    if (e.key === 'Escape') $('back').click();
-    if ((e.key === ' ' || e.key === 'Enter') && document.body.classList.contains('show')) { e.preventDefault(); go(); }
+    const res = $('result').classList.contains('open'), dr = $('draw').classList.contains('open');
+    if (e.key === 'Escape' && (res || dr)) closeFull();
+    if ((e.key === ' ' || e.key === 'Enter') && (res || dr)) { e.preventDefault(); res ? go() : drawNext(); }
   });
 
   load(); render();
