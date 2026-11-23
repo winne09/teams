@@ -135,11 +135,12 @@
 
   <section class="box">
     <h2>Wie einteilen?</h2>
+    <p class="hint" style="margin:-4px 0 10px">Leistungsgruppen und M | J getrennt lassen sich dazuschalten, auch beide.</p>
     <div class="grid2" role="group" aria-label="Art der Einteilung">
       <button data-kind="fair">⚖️ Fair gemischt</button>
-      <button data-kind="level">📶 Leistungsgruppen</button>
-      <button data-kind="split">M | J getrennt</button>
       <button data-kind="random">🎲 Zufall</button>
+      <button data-opt="level">📶 Leistungsgruppen</button>
+      <button data-opt="split">M | J getrennt</button>
     </div>
     <p class="hint" id="kindHint"></p>
     <div class="seg" role="group" aria-label="Anzahl oder Größe" style="margin-top:14px">
@@ -151,7 +152,7 @@
       <div class="num" id="val">2</div>
       <button class="round" id="plus" aria-label="mehr">+</button>
     </div>
-    <p class="hint" id="preview" style="text-align:center"></p>
+    <p class="hint" id="preview" style="text-align:center;white-space:pre-line"></p>
   </section>
 
   <button class="big acc" id="go">Teams bilden</button>
@@ -161,9 +162,9 @@
     <div class="row">
       <button id="exportBtn" class="small grow">⬇ Klassen als Datei sichern</button>
       <button id="importBtn" class="small grow">⬆ Datei laden</button>
-      <input type="file" id="importFile" accept=".json,application/json" hidden>
+      <input type="file" id="importFile" accept=".json,.csv,.txt,application/json,text/csv,text/plain" hidden>
     </div>
-    <p class="hint">Die Datei kannst du z. B. per AirDrop, USB oder Schul-Cloud auf das andere Gerät bringen und dort laden.</p>
+    <p class="hint">Die Datei kannst du z. B. per AirDrop, USB oder Schul-Cloud auf das andere Gerät bringen und dort laden. „Datei laden“ nimmt auch Namenslisten als .csv oder .txt (z. B. aus Excel).</p>
     <div id="msg" role="status"></div>
   </section>
 
@@ -217,8 +218,15 @@
     <h2 id="dlgTitle">Namen bearbeiten</h2>
     <label class="hint" for="clsName">Name der Klasse</label>
     <input type="text" id="clsName" placeholder="z. B. 7b Sport" autocomplete="off">
-    <p class="hint">Ein Name pro Zeile. Du kannst auch aus einer Tabelle einfügen. Tipp: Vornamen oder Kürzel reichen.</p>
+    <button id="photoBtn" class="acc" style="width:100%;margin-top:12px">📷 Namen aus Foto lesen</button>
+    <input type="file" id="photoFile" accept="image/*" hidden>
+    <p class="hint" id="photoMsg">Foto oder Screenshot einer gedruckten Liste (z. B. aus dem Kursnotizbuch). Die Erkennung läuft nur auf diesem Gerät. Danach kurz prüfen.</p>
+    <p class="hint">Oder: ein Name pro Zeile eintippen bzw. einfügen (Kursnotizbuch, Excel). Nummern, Leerzeilen und Überschriften werden entfernt, „Nachname, Vorname“ wird umgedreht.</p>
     <textarea id="names" placeholder="Anna&#10;Ben&#10;Can&#10;…" autocomplete="off" autocapitalize="words" spellcheck="false"></textarea>
+    <div class="row" style="margin-top:8px">
+      <button id="tidy" class="small">✨ Aufräumen</button>
+      <button id="firstNames" class="small">Nur Vornamen</button>
+    </div>
     <div class="row" style="margin-top:10px">
       <button id="save" class="acc grow">Speichern</button>
       <button id="cancel">Abbrechen</button>
@@ -242,23 +250,27 @@
   const MAXT = COLORS.length;
   const G_SHORT = { w:'M', m:'J', '':'–' }, G_LONG = { w:'Mädchen', m:'Junge', '':'ohne Angabe' };
   const KIND_HINT = {
-    fair: 'Stärke, Mädchen/Jungen und Torwart werden gleichmäßig auf alle Teams verteilt.',
-    level: 'Die Stärkeren spielen in Feld 1, die Schwächeren in Feld 2. Innerhalb jedes Feldes sind die Teams ausgeglichen. Am besten 4, 6 oder 8 Teams.',
-    split: 'Eigene Mädchen-Teams und Jungen-Teams, jeweils ausgeglichen. Personen ohne Angabe kommen dorthin, wo weniger sind.',
+    fair: 'Stärke, Mädchen/Jungen und Torwart werden gleichmäßig auf die Teams verteilt.',
     random: 'Reiner Zufall. Nur „Nie zusammen“ wird beachtet.'
+  };
+  const OPT_HINT = {
+    level: 'Leistungsgruppen: Die Stärkeren spielen auf einem Feld, die Schwächeren auf einem anderen – dort jeweils ausgeglichen. Braucht mindestens 4 Teams.',
+    split: 'M | J getrennt: eigene Mädchen- und Jungen-Teams. Personen ohne Angabe kommen dorthin, wo weniger sind.'
   };
 
   // ---------- Speicher ----------
   let S;
   function load() {
     try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) { S = null; }
-    if (!S || !Array.isArray(S.classes)) S = { ver:3, classes:[], cur:null, mode:'count', count:2, size:5, kind:'fair' };
+    if (!S || !Array.isArray(S.classes)) S = { ver:4, classes:[], cur:null, mode:'count', count:2, size:5, kind:'fair', level:false, split:false };
     if (!S.ver) S.classes.forEach(c => c.st.forEach(s => { if (s.lv) s.lv = s.lv * 2 - 1; })); // v1: 3 Stufen → 5
     if ((S.ver || 1) < 3) { S.kind = 'fair'; delete S.balance; delete S.gender; S.ver = 3; }
     S.classes.forEach(fixClass);
     if (!S.classes.length) { const c = newClass('Meine Klasse'); S.cur = c.id; }
     if (!cur()) S.cur = S.classes[0].id;
+    if (S.ver === 3) { S.level = S.kind === 'level'; S.split = S.kind === 'split'; S.ver = 4; } // v2: eine Art → Kombination
     if (!KIND_HINT[S.kind]) S.kind = 'fair';
+    S.level = !!S.level; S.split = !!S.split;
     save();
   }
   function fixClass(c) {
@@ -311,12 +323,21 @@
     const pr = present(), n = pr.length;
     const w = pr.filter(s => s.g === 'w').length, m = pr.filter(s => s.g === 'm').length;
     $('count').innerHTML = '<b>' + n + '</b> von ' + c.st.length + ' da' + (w || m ? ' · ' + w + ' M · ' + m + ' J' : '');
+    const fair = S.kind === 'fair';
     document.querySelectorAll('[data-kind]').forEach(b => b.classList.toggle('on', b.dataset.kind === S.kind));
-    $('kindHint').textContent = KIND_HINT[S.kind];
+    document.querySelectorAll('[data-opt]').forEach(b => { b.classList.toggle('on', fair && S[b.dataset.opt]); b.style.opacity = fair ? 1 : .45; });
+    $('kindHint').textContent = fair ? [KIND_HINT.fair].concat(['level', 'split'].filter(o => S[o]).map(o => OPT_HINT[o])).join(' ') : KIND_HINT.random;
     $('byCount').classList.toggle('on', S.mode === 'count');
     $('bySize').classList.toggle('on', S.mode === 'size');
     $('val').textContent = S.mode === 'count' ? S.count : S.size;
-    $('preview').textContent = n ? sizesText(n, teamCount(n)) : '';
+    let pv = n ? sizesText(n, teamCount(n)) : '';
+    if (n && fair && (S.level || S.split)) {
+      const fs = fields();
+      if (fs.length > 1) pv += '\n' + fs.map(f => f.label + ' – ' + f.name + ': ' + f.k + (f.k > 1 ? ' Teams' : ' Team')).join('\n');
+      if (S.level && !fs.some(f => f.lvl)) pv += ' · Für Leistungsgruppen mehr Teams wählen.';
+      if (S.split && !fs.some(f => f.sex)) pv += ' · Für M | J getrennt erst M/J eintragen.';
+    }
+    $('preview').textContent = pv;
     $('go').disabled = n < 2; $('go').style.opacity = n < 2 ? .4 : 1;
     $('drawBtn').disabled = n < 1;
   }
@@ -376,30 +397,40 @@
 
   // Teilt Personen in Felder (Gruppen von Teams) auf; jedes Feld wird für sich verteilt.
   function fields() {
+    // Beide Optionen lassen sich kombinieren: erst nach M/J trennen, dann jede Gruppe nach Leistung teilen.
     const pl = present(), n = pl.length, k = Math.min(teamCount(n), n);
-    if (S.kind === 'level' && k >= 2) {
-      const k1 = Math.ceil(k / 2), n1 = Math.round(n * k1 / k);
-      const sorted = shuffle(pl.slice()).sort((a, b) => (b.lv || 3) - (a.lv || 3));
-      return [{ label:'Feld 1', pl:sorted.slice(0, n1), k:k1 }, { label:'Feld 2', pl:sorted.slice(n1), k:k - k1 }];
-    }
-    if (S.kind === 'split' && k >= 2) {
+    let fs = [{ name:'', pl, k }];
+    if (S.kind === 'fair' && S.split && k >= 2) {
       const W = pl.filter(p => p.g === 'w'), M = pl.filter(p => p.g === 'm'), O = shuffle(pl.filter(p => !p.g));
       if (W.length && M.length) {
         let kw = Math.round(k * W.length / (W.length + M.length));
         kw = Math.max(1, Math.min(k - 1, kw));
-        const fw = { label:'Mädchen', pl:W, k:kw }, fm = { label:'Jungen', pl:M, k:k - kw };
+        // mit Leistungsgruppen: gerade Anzahl je Geschlecht, damit jede Hälfte mind. 2 Teams hat
+        if (S.level && k >= 8) kw = Math.max(4, Math.min(k - 4, 2 * Math.round(kw / 2)));
+        const fw = { name:'Mädchen', pl:W.slice(), k:kw, sex:1 }, fm = { name:'Jungen', pl:M.slice(), k:k - kw, sex:1 };
         O.forEach(p => (fw.pl.length / fw.k <= fm.pl.length / fm.k ? fw : fm).pl.push(p));
-        return [fw, fm].filter(f => f.pl.length);
+        fs = [fw, fm];
       }
     }
-    return [{ label:'', pl, k }];
+    if (S.kind === 'fair' && S.level) {
+      fs = fs.flatMap(f => {
+        if (f.k < 4) return [f]; // je Leistungsfeld mindestens 2 Teams
+        const k1 = Math.ceil(f.k / 2), n1 = Math.round(f.pl.length * k1 / f.k);
+        const sorted = shuffle(f.pl.slice()).sort((a, b) => (b.lv || 3) - (a.lv || 3));
+        return [{ name:f.name ? f.name + ' stärker' : 'stärker', pl:sorted.slice(0, n1), k:k1, sex:f.sex, lvl:1 },
+                { name:f.name ? f.name + ' schwächer' : 'schwächer', pl:sorted.slice(n1), k:f.k - k1, sex:f.sex, lvl:1 }];
+      });
+    }
+    fs = fs.filter(f => f.pl.length);
+    fs.forEach((f, i) => f.label = fs.length > 1 ? 'Feld ' + (i + 1) : '');
+    return fs;
   }
 
   let lastKey = '', lastBad = 0;
   function makeTeams() {
     let best = null;
     // mehrere Versuche, der beste gewinnt: „Nie zusammen“ einhalten, Stärke möglichst gleich, nicht dieselbe Einteilung wie eben
-    const fair = S.kind !== 'random';
+    const fair = S.kind === 'fair';
     for (let t = 0; t < (fair ? 40 : 15); t++) {
       const out = []; let bad = 0, spread = 0;
       fields().forEach((f, fi) => {
@@ -430,7 +461,7 @@
     box.style.gridTemplateColumns = 'repeat(' + cols + ',minmax(0,1fr))';
     box.style.gridTemplateRows = 'repeat(' + Math.ceil(k / cols) + ',minmax(0,1fr))';
     box.innerHTML = '';
-    const showField = result.some(t => t.f) && S.kind === 'level';
+    const showField = result.some(t => t.f);
     result.forEach((t, ti) => {
       const [name, c, tc] = COLORS[ti];
       const d = document.createElement('div'); d.className = 'team';
@@ -554,6 +585,95 @@
   }
   function closeEdit() { $('dlg').classList.remove('open'); }
 
+  // ---------- Namenslisten aufräumen ----------
+  const HEAD = /^(nr\.?|lfd\.?( nr\.?)?|name[n]?|vorname|nachname|rufname|klasse\b.*|jahrgang\b.*|stufe\b.*|kurs\b.*|schüler.*|sch(ü|ue)ler\*?innen.*|teilnehmer.*|liste.*|geschlecht|m\/w|datum)$/i;
+  function cleanNames(text) {
+    const out = [];
+    const clean = t => t.replace(/[“”"„]/g, '').replace(/^[\s\-–•*·>]+/, '').replace(/^\(?\d{1,3}[.)\]:]?\s+/, '')
+      .replace(/\s+\d[\d./:-]*\s*$/, '').replace(/\s+/g, ' ').trim();
+    const ok = t => /\p{L}/u.test(t) && !HEAD.test(t) && !t.split(/\s+/).every(w => HEAD.test(w)) && t.length <= 40;
+    text.split(/\r?\n|\r/).forEach(line => {
+      line = line.trim(); if (!line) return;
+      // Tabelle (Tab oder Semikolon): Spalten mit Buchstaben, ohne Zahlen/Kürzel wie m/w
+      if (/[\t;]/.test(line)) {
+        const cells = line.split(/[\t;]/).map(clean).filter(c => ok(c) && !/^(m|w|d|j)$/i.test(c));
+        if (!cells.length) return;
+        if (cells.length >= 2 && cells.length <= 3 && !cells.some(c => /\s/.test(c))) out.push(cells[1] + ' ' + cells[0]); // Nachname; Vorname
+        else if (cells.length <= 3) out.push(cells.join(' '));
+        else cells.forEach(c => out.push(c));
+        return;
+      }
+      const commas = (line.match(/,/g) || []).length;
+      if (commas >= 2) { line.split(',').map(clean).filter(ok).forEach(c => out.push(c)); return; } // Anna, Ben, Can
+      let t = clean(line);
+      if (commas === 1) { const [a, b] = t.split(',').map(x => x.trim()); t = b && a ? b + ' ' + a : (a || b); } // Nachname, Vorname
+      if (t && ok(t)) out.push(t);
+    });
+    const seen = new Set();
+    return out.filter(n => !seen.has(n.toLowerCase()) && seen.add(n.toLowerCase()));
+  }
+  function onlyFirst(names) {
+    const first = n => n.split(' ')[0];
+    const cnt = {}; names.forEach(n => cnt[first(n)] = (cnt[first(n)] || 0) + 1);
+    return names.map(n => { const p = n.split(' '); return cnt[p[0]] > 1 && p.length > 1 ? p[0] + ' ' + p[p.length - 1][0] + '.' : p[0]; });
+  }
+  $('tidy').onclick = () => { $('names').value = cleanNames($('names').value).join('\n'); };
+  $('firstNames').onclick = () => { $('names').value = onlyFirst(cleanNames($('names').value)).join('\n'); };
+  $('names').addEventListener('paste', () => setTimeout(() => {
+    const before = $('names').value, after = cleanNames(before).join('\n');
+    if (after !== before.trim()) $('names').value = after;
+  }, 0));
+
+  // ---------- Namen aus Foto (Texterkennung auf dem Gerät, Tesseract) ----------
+  const OCR = new URL('ocr/', location.href).href;
+  let ocrLib = null;
+  function loadOcr() {
+    if (!ocrLib) ocrLib = new Promise((ok, fail) => {
+      const sc = document.createElement('script'); sc.src = OCR + 'tesseract.min.js';
+      sc.onload = () => ok(window.Tesseract); sc.onerror = () => { ocrLib = null; fail(); };
+      document.head.appendChild(sc);
+    });
+    return ocrLib;
+  }
+  // Foto verkleinern (schneller) und in Graustufen umwandeln (besser lesbar)
+  function prepImage(file) {
+    return new Promise((ok, fail) => {
+      const img = new Image(), url = URL.createObjectURL(file);
+      img.onload = () => {
+        const sc = Math.min(1, 2200 / Math.max(img.width, img.height));
+        const cv = document.createElement('canvas'); cv.width = Math.round(img.width * sc); cv.height = Math.round(img.height * sc);
+        const cx = cv.getContext('2d'); cx.filter = 'grayscale(1) contrast(1.3)'; cx.drawImage(img, 0, 0, cv.width, cv.height);
+        URL.revokeObjectURL(url); ok(cv);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); fail(); };
+      img.src = url;
+    });
+  }
+  const photoMsg = t => { $('photoMsg').textContent = t; };
+  $('photoBtn').onclick = () => $('photoFile').click();
+  $('photoFile').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    const btn = $('photoBtn'); btn.disabled = true;
+    let worker;
+    try {
+      photoMsg('Texterkennung wird geladen …');
+      const T = await loadOcr();
+      const cv = await prepImage(f);
+      worker = await T.createWorker('deu', 1, {
+        workerPath: OCR + 'worker.min.js', corePath: OCR, langPath: OCR, gzip: true, workerBlobURL: false,
+        logger: m => { if (m.status === 'recognizing text') photoMsg('Lese Namen … ' + Math.round(m.progress * 100) + ' %'); }
+      });
+      const { data } = await worker.recognize(cv);
+      const names = cleanNames(data.text).filter(n => /^\p{L}[\p{L} .'’-]*\p{L}\.?$/u.test(n) && n.split(' ').length <= 4);
+      if (!names.length) { photoMsg('Keine Namen erkannt. Tipp: Liste gerade und hell fotografieren oder einen Screenshot nehmen.'); return; }
+      const old = $('names').value.trim();
+      $('names').value = cleanNames((old ? old + '\n' : '') + names.join('\n')).join('\n');
+      photoMsg('✓ ' + names.length + ' Namen erkannt. Bitte kurz prüfen und Fehler korrigieren.');
+    } catch (err) {
+      photoMsg('Das hat nicht geklappt. Beim ersten Mal braucht die Texterkennung Internet (ca. 9 MB), danach geht es offline.');
+    } finally { if (worker) worker.terminate(); btn.disabled = false; }
+  };
+
   // ---------- Datei sichern / laden ----------
   function flash(t) { $('msg').textContent = t; setTimeout(() => { if ($('msg').textContent === t) $('msg').textContent = ''; }, 5000); }
   $('exportBtn').onclick = () => {
@@ -570,6 +690,15 @@
     const f = e.target.files[0]; if (!f) return;
     const r = new FileReader();
     r.onload = () => {
+      if (!/\.json$/i.test(f.name) && !/^\s*\{/.test(r.result)) { // Namensliste als Text/CSV → zum Prüfen öffnen
+        const names = cleanNames(r.result);
+        e.target.value = '';
+        if (!names.length) return flash('In dieser Datei wurden keine Namen gefunden.');
+        openEdit(true);
+        $('clsName').value = f.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
+        $('names').value = names.join('\n');
+        return;
+      }
       try {
         const d = JSON.parse(r.result);
         if (d.app !== 'teams-generator' || !Array.isArray(d.classes)) throw 0;
@@ -597,7 +726,10 @@
   $('newCls').onclick = () => openEdit(true);
   $('editBtn').onclick = () => openEdit(false);
   $('allIn').onclick = () => { cur().st.forEach(s => s.abs = false); save(); render(); };
-  document.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => { S.kind = b.dataset.kind; save(); render(); });
+  document.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => {
+    S.kind = b.dataset.kind; if (S.kind === 'random') { S.level = S.split = false; } save(); render(); });
+  document.querySelectorAll('[data-opt]').forEach(b => b.onclick = () => {
+    const o = b.dataset.opt; S.kind = 'fair'; S[o] = !S[o]; save(); render(); });
   $('byCount').onclick = () => { S.mode = 'count'; save(); render(); };
   $('bySize').onclick = () => { S.mode = 'size'; save(); render(); };
   const step = d => {
