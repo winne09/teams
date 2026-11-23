@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Teams">
+<meta name="theme-color" content="#000000">
+<title>Teams-Generator</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+  :root { --acc:#ffb020; --bg:#000; --card:#18181b; --card2:#232326; --line:#3f3f46; --fg:#f4f4f5; --mut:#a1a1aa; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; touch-action:manipulation; }
+  body { padding:calc(12px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right))
+    calc(24px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left)); }
+  .wrap { max-width:860px; margin:0 auto; }
+  h1 { font-size:28px; margin:4px 0 14px; } h1 span { color:var(--acc); }
+  h2 { font-size:15px; text-transform:uppercase; letter-spacing:.06em; color:var(--mut); margin:0 0 10px; font-weight:700; }
+  .box { background:var(--card); border:1px solid #27272a; border-radius:16px; padding:14px; margin-bottom:14px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .grow { flex:1; min-width:0; }
+  button, select, input[type=text], textarea { font:inherit; font-size:17px; color:var(--fg); background:var(--card2);
+    border:1px solid var(--line); border-radius:12px; min-height:50px; padding:0 16px; }
+  button { cursor:pointer; -webkit-user-select:none; user-select:none; }
+  button:active { background:var(--line); }
+  button.acc, .seg button.on { background:var(--acc); color:#111; border-color:var(--acc); font-weight:700; }
+  button.big { width:100%; min-height:68px; font-size:24px; font-weight:800; border:0; }
+  /* „Teams bilden“ bleibt auch bei langen Listen unten sichtbar */
+  #go { position:sticky; bottom:calc(10px + env(safe-area-inset-bottom)); z-index:5; box-shadow:0 6px 24px #000; }
+  button.round { width:56px; padding:0; font-size:28px; font-weight:700; }
+  button.small { min-height:44px; padding:0 12px; font-size:15px; }
+  button.danger { color:#fca5a5; border-color:#7f1d1d; }
+  select { padding:0 12px; }
+  textarea { width:100%; min-height:240px; padding:12px; line-height:1.5; resize:vertical; }
+  input[type=text] { width:100%; }
+  .seg { display:flex; gap:0; } .seg button { border-radius:0; flex:1; }
+  .seg button:first-child { border-radius:12px 0 0 12px; } .seg button:last-child { border-radius:0 12px 12px 0; }
+  .num { min-width:70px; text-align:center; font-size:34px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .hint { color:var(--mut); font-size:14px; line-height:1.45; margin:8px 0 0; }
+  .switch { display:flex; align-items:center; gap:12px; min-height:50px; font-size:17px; cursor:pointer; }
+  .switch input { width:28px; height:28px; accent-color:var(--acc); }
+  .count { font-weight:700; } .count b { color:var(--acc); }
+
+  /* Klassenliste */
+  #list { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:8px; margin-top:10px; }
+  .st { display:flex; align-items:stretch; gap:0; background:var(--card2); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .st .nm { flex:1; text-align:left; border:0; border-radius:0; background:none; min-height:52px; font-size:18px; font-weight:600;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 12px; }
+  .st .nm::before { content:"✓"; color:#86efac; font-weight:800; margin-right:10px; }
+  .st.abs { opacity:.5; } .st.abs .nm { text-decoration:line-through; } .st.abs .nm::before { content:"✗"; color:#fca5a5; }
+  .st .lv { border:0; border-left:1px solid var(--line); border-radius:0; background:none; min-width:74px; padding:0 8px;
+    font-size:15px; letter-spacing:2px; color:var(--acc); }
+  .st .lv.none { color:#52525b; }
+  body:not(.balance) .st .lv { display:none; }
+  .empty { color:var(--mut); padding:12px 0; }
+
+  /* Ergebnis */
+  #result { position:fixed; inset:0; background:#000; z-index:20; display:none; flex-direction:column;
+    padding:calc(10px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right))
+    calc(10px + env(safe-area-inset-bottom)) calc(10px + env(safe-area-inset-left)); }
+  body.show #result { display:flex; } body.show { overflow:hidden; }
+  #teams { flex:1; display:grid; gap:10px; min-height:0; }
+  .team { border-radius:16px; background:var(--card); border:3px solid var(--c); display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+  .team h3 { margin:0; background:var(--c); color:var(--t); padding:.25em .5em; font-size:1.1em; display:flex; justify-content:space-between; gap:.5em; }
+  .team h3 small { font-weight:600; opacity:.8; }
+  .team ul { list-style:none; margin:0; padding:.25em .5em; flex:1; overflow:hidden; }
+  .team li { padding:.12em .3em; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:8px; cursor:pointer; }
+  .team li.sel { background:var(--acc); color:#111; }
+  #rbar { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  #rbar button { flex:1; min-height:56px; font-size:18px; font-weight:700; }
+  #rhint { width:100%; text-align:center; color:var(--mut); font-size:14px; }
+
+  /* Bearbeiten-Dialog */
+  #dlg { position:fixed; inset:0; background:rgba(0,0,0,.8); z-index:30; display:none; align-items:flex-start; justify-content:center;
+    padding:calc(16px + env(safe-area-inset-top)) 14px 16px; overflow:auto; }
+  #dlg.open { display:flex; }
+  #dlg .box { width:100%; max-width:640px; }
+  #offline { font-size:13px; color:var(--mut); text-align:center; margin-top:8px; }
+  #offline.ok { color:#86efac; }
+  footer { color:var(--mut); font-size:13px; text-align:center; line-height:1.5; }
+  @media (prefers-reduced-motion: no-preference) { .team { animation:pop .25s ease-out both; } }
+  @keyframes pop { from { transform:scale(.96); opacity:0; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Teams<span>-Generator</span></h1>
+
+  <section class="box">
+    <h2>Klasse / Gruppe</h2>
+    <div class="row">
+      <select id="cls" class="grow" aria-label="Klasse wählen"></select>
+      <button id="newCls" class="small">+ Neu</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="editBtn" class="small">✎ Namen bearbeiten</button>
+      <button id="allIn" class="small">Alle anwesend</button>
+      <span class="grow"></span>
+      <span class="count" id="count"></span>
+    </div>
+    <p class="hint">Antippen = abwesend/anwesend.</p>
+    <div id="list"></div>
+  </section>
+
+  <section class="box">
+    <h2>Einteilung</h2>
+    <div class="seg" role="group" aria-label="Art der Einteilung">
+      <button id="byCount" class="on">Anzahl Teams</button>
+      <button id="bySize">Teamgröße</button>
+    </div>
+    <div class="row" style="justify-content:center;margin-top:12px">
+      <button class="round" id="minus" aria-label="weniger">−</button>
+      <div class="num" id="val">2</div>
+      <button class="round" id="plus" aria-label="mehr">+</button>
+    </div>
+    <p class="hint" id="preview" style="text-align:center"></p>
+    <label class="switch"><input type="checkbox" id="balance"> Stärken ausgleichen</label>
+    <p class="hint" id="balHint">Bei jedem Namen erscheint ein Knopf: ●○○ schwächer, ●●○ mittel, ●●● stärker. Ohne Angabe zählt „mittel“. Die Stufen sind im Ergebnis nicht zu sehen.</p>
+  </section>
+
+  <button class="big acc" id="go">Teams bilden</button>
+  <div id="offline"></div>
+  <footer>
+    <p>Alle Namen bleiben nur auf diesem Gerät gespeichert. Kein Konto, keine Datenübertragung, kein Tracking.</p>
+  </footer>
+</div>
+
+<div id="result" aria-live="polite">
+  <div id="teams"></div>
+  <div id="rbar">
+    <div id="rhint">Tipp: zwei Namen nacheinander antippen, um sie zu tauschen.</div>
+    <button id="again" class="acc">🔀 Neu mischen</button>
+    <button id="back">‹ Zurück</button>
+  </div>
+</div>
+
+<div id="dlg">
+  <div class="box">
+    <h2 id="dlgTitle">Namen bearbeiten</h2>
+    <label class="hint" for="clsName">Name der Klasse</label>
+    <input type="text" id="clsName" placeholder="z. B. 7b Sport" autocomplete="off">
+    <p class="hint">Ein Name pro Zeile. Du kannst auch aus einer Tabelle einfügen. Tipp: Vornamen oder Kürzel reichen.</p>
+    <textarea id="names" placeholder="Anna&#10;Ben&#10;Can&#10;…" autocomplete="off" autocapitalize="words" spellcheck="false"></textarea>
+    <div class="row" style="margin-top:10px">
+      <button id="save" class="acc grow">Speichern</button>
+      <button id="cancel">Abbrechen</button>
+    </div>
+    <div class="row" style="margin-top:18px">
+      <button id="delCls" class="small danger">Klasse löschen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const KEY = 'teams-generator-v1';
+  // Leibchenfarben: Hintergrund, Schriftfarbe
+  const COLORS = [
+    ['Orange','#ffb020','#111'], ['Blau','#3b82f6','#fff'], ['Grün','#22c55e','#111'], ['Rot','#ef4444','#fff'],
+    ['Gelb','#fde047','#111'], ['Lila','#a855f7','#fff'], ['Weiß','#f4f4f5','#111'], ['Pink','#ec4899','#fff'],
+    ['Türkis','#2dd4bf','#111'], ['Grau','#71717a','#fff'], ['Braun','#a16207','#fff'], ['Hellblau','#7dd3fc','#111']
+  ];
+  const MAXT = COLORS.length;
+
+  let S;
+  function load() {
+    try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) { S = null; }
+    if (!S || !Array.isArray(S.classes)) S = { classes:[], cur:null, mode:'count', count:2, size:5, balance:false };
+    if (!S.classes.length) { const c = newClass('Meine Klasse'); S.cur = c.id; }
+    if (!cur()) S.cur = S.classes[0].id;
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+  function newClass(name) { const c = { id:Date.now().toString(36)+Math.random().toString(36).slice(2,6), name, st:[] }; S.classes.push(c); return c; }
+  const cur = () => S.classes.find(c => c.id === S.cur);
+  const present = () => cur().st.filter(s => !s.abs);
+
+  function teamCount(n) {
+    if (S.mode === 'count') return Math.max(1, Math.min(S.count, n || S.count, MAXT));
+    if (!n) return 0;
+    return Math.max(1, Math.min(MAXT, Math.round(n / S.size)));
+  }
+  function sizesText(n, k) {
+    if (!n || !k) return '';
+    const lo = Math.floor(n / k), hi = Math.ceil(n / k);
+    return k + (k === 1 ? ' Team' : ' Teams') + ' mit ' + (lo === hi ? lo : lo + '–' + hi) + ' Personen';
+  }
+
+  // ---------- Anzeige Startseite ----------
+  function render() {
+    document.body.classList.toggle('balance', !!S.balance);
+    $('balance').checked = !!S.balance;
+    $('balHint').style.display = S.balance ? '' : 'none';
+    const sel = $('cls'); sel.innerHTML = '';
+    S.classes.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; sel.appendChild(o); });
+    sel.value = S.cur;
+    const c = cur(), list = $('list'); list.innerHTML = '';
+    if (!c.st.length) list.innerHTML = '<div class="empty">Noch keine Namen. Tippe auf „✎ Namen bearbeiten“.</div>';
+    c.st.forEach((s, i) => {
+      const d = document.createElement('div'); d.className = 'st' + (s.abs ? ' abs' : '');
+      const nm = document.createElement('button'); nm.className = 'nm'; nm.textContent = s.n;
+      nm.setAttribute('aria-label', s.n + (s.abs ? ', abwesend' : ', anwesend'));
+      nm.onclick = () => { s.abs = !s.abs; save(); render(); };
+      const lv = document.createElement('button'); lv.className = 'lv' + (s.lv ? '' : ' none');
+      lv.textContent = s.lv ? '●'.repeat(s.lv) + '○'.repeat(3 - s.lv) : '○○○';
+      lv.setAttribute('aria-label', 'Stärke ' + (s.lv || 'ohne Angabe'));
+      lv.onclick = () => { s.lv = ((s.lv || 0) + 1) % 4; save(); render(); };
+      d.append(nm, lv); list.appendChild(d);
+    });
+    const n = present().length;
+    $('count').innerHTML = '<b>' + n + '</b> von ' + c.st.length + ' da';
+    $('byCount').classList.toggle('on', S.mode === 'count');
+    $('bySize').classList.toggle('on', S.mode === 'size');
+    $('val').textContent = S.mode === 'count' ? S.count : S.size;
+    $('preview').textContent = n ? sizesText(n, teamCount(n)) : '';
+    $('go').disabled = n < 2;
+    $('go').style.opacity = n < 2 ? .4 : 1;
+  }
+
+  // ---------- Verteilung ----------
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  let lastKey = '';
+  function makeTeams() {
+    const pl = present(), n = pl.length, k = Math.min(teamCount(n), n);
+    // feste Größen: Unterschied höchstens 1, welche Teams größer sind, ist zufällig
+    const cap = shuffle(Array.from({ length:k }, (_, i) => Math.floor(n / k) + (i < n % k ? 1 : 0)));
+    let best = null;
+    // mehrere Versuche: vermeidet, dass genau dieselbe Einteilung wie eben herauskommt
+    for (let t = 0; t < 8; t++) {
+      const teams = Array.from({ length:k }, () => ({ m:[], sum:0 }));
+      let order = shuffle(pl.slice());
+      if (S.balance) order.sort((a, b) => (b.lv || 2) - (a.lv || 2)); // stabil: innerhalb einer Stufe zufällig
+      for (const p of order) {
+        const v = S.balance ? (p.lv || 2) : 0;
+        let cand = teams.map((tm, i) => i).filter(i => teams[i].m.length < cap[i]);
+        if (S.balance) {
+          const min = Math.min(...cand.map(i => teams[i].sum));
+          cand = cand.filter(i => teams[i].sum === min);
+          // bei gleicher Summe: Team mit mehr freien Plätzen bevorzugen
+          const free = Math.max(...cand.map(i => cap[i] - teams[i].m.length));
+          cand = cand.filter(i => cap[i] - teams[i].m.length === free);
+        } else {
+          const fill = Math.min(...cand.map(i => teams[i].m.length / cap[i]));
+          cand = cand.filter(i => teams[i].m.length / cap[i] === fill);
+        }
+        const i = cand[Math.floor(Math.random() * cand.length)];
+        teams[i].m.push(p.n); teams[i].sum += v;
+      }
+      const key = teams.map(tm => tm.m.slice().sort().join(',')).sort().join('|');
+      best = teams;
+      if (key !== lastKey) { lastKey = key; break; }
+    }
+    return best.map(tm => tm.m);
+  }
+
+  // ---------- Ergebnis ----------
+  let result = [], sel = null;
+  function showResult() {
+    const box = $('teams'), k = result.length;
+    const landscape = innerWidth > innerHeight;
+    let cols = k <= 2 ? k : k <= 4 ? 2 : k <= 6 ? 3 : 4;
+    if (!landscape) cols = k <= 3 ? 1 : 2;
+    if (landscape && k === 3) cols = 3;
+    if (landscape && k === 4 && innerWidth > 900) cols = 4;
+    box.style.gridTemplateColumns = 'repeat(' + cols + ',minmax(0,1fr))';
+    box.style.gridTemplateRows = 'repeat(' + Math.ceil(k / cols) + ',minmax(0,1fr))';
+    box.innerHTML = '';
+    result.forEach((m, ti) => {
+      const [name, c, t] = COLORS[ti];
+      const d = document.createElement('div'); d.className = 'team';
+      d.style.setProperty('--c', c); d.style.setProperty('--t', t);
+      const h = document.createElement('h3'); h.innerHTML = '<span></span><small></small>';
+      h.firstChild.textContent = 'Team ' + name; h.lastChild.textContent = m.length;
+      const ul = document.createElement('ul');
+      m.forEach((nm, pi) => {
+        const li = document.createElement('li'); li.textContent = nm;
+        if (sel && sel[0] === ti && sel[1] === pi) li.className = 'sel';
+        li.onclick = () => tap(ti, pi);
+        ul.appendChild(li);
+      });
+      d.append(h, ul); box.appendChild(d);
+    });
+    fit();
+  }
+  // Schrift so groß wie möglich, ohne dass Namen abgeschnitten werden
+  function fit() {
+    const box = $('teams'), teams = [...box.children];
+    let lo = 12, hi = 96;
+    const ok = () => teams.every(t => { const ul = t.querySelector('ul');
+      return ul.scrollHeight <= ul.clientHeight + 1 && [...ul.children].every(li => li.scrollWidth <= li.clientWidth + 1); });
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1; box.style.fontSize = mid + 'px';
+      if (ok()) lo = mid; else hi = mid;
+    }
+    box.style.fontSize = lo + 'px';
+  }
+  function tap(ti, pi) {
+    if (!sel) sel = [ti, pi];
+    else if (sel[0] === ti && sel[1] === pi) sel = null;
+    else { const a = result[sel[0]], b = result[ti]; [a[sel[1]], b[pi]] = [b[pi], a[sel[1]]]; sel = null; }
+    showResult();
+  }
+  function go() {
+    if (present().length < 2) return;
+    result = makeTeams(); sel = null;
+    document.body.classList.add('show'); showResult();
+  }
+
+  // ---------- Bearbeiten ----------
+  let editingNew = false;
+  function openEdit(isNew) {
+    editingNew = isNew;
+    $('dlgTitle').textContent = isNew ? 'Neue Klasse' : 'Namen bearbeiten';
+    $('clsName').value = isNew ? '' : cur().name;
+    $('names').value = isNew ? '' : cur().st.map(s => s.n).join('\n');
+    $('delCls').style.display = isNew || S.classes.length < 2 ? 'none' : '';
+    $('dlg').classList.add('open');
+    (isNew ? $('clsName') : $('names')).focus();
+  }
+  function saveEdit() {
+    const names = $('names').value.split(/[\n\r\t;]+/).map(s => s.trim().replace(/\s+/g, ' ')).filter(Boolean);
+    let c;
+    if (editingNew) { c = newClass('Klasse'); S.cur = c.id; } else c = cur();
+    c.name = $('clsName').value.trim() || c.name || 'Klasse';
+    const old = new Map(c.st.map(s => [s.n, s]));
+    const seen = new Set();
+    c.st = names.filter(n => !seen.has(n) && seen.add(n)).map(n => old.get(n) || { n, lv:0, abs:false });
+    save(); closeEdit(); render();
+  }
+  function closeEdit() { $('dlg').classList.remove('open'); }
+
+  // ---------- Bedienung ----------
+  $('cls').onchange = e => { S.cur = e.target.value; save(); render(); };
+  $('newCls').onclick = () => openEdit(true);
+  $('editBtn').onclick = () => openEdit(false);
+  $('allIn').onclick = () => { cur().st.forEach(s => s.abs = false); save(); render(); };
+  $('byCount').onclick = () => { S.mode = 'count'; save(); render(); };
+  $('bySize').onclick = () => { S.mode = 'size'; save(); render(); };
+  const step = d => {
+    if (S.mode === 'count') S.count = Math.max(2, Math.min(MAXT, S.count + d));
+    else S.size = Math.max(2, Math.min(15, S.size + d));
+    save(); render();
+  };
+  $('minus').onclick = () => step(-1); $('plus').onclick = () => step(1);
+  $('balance').onchange = e => { S.balance = e.target.checked; save(); render(); };
+  $('go').onclick = go;
+  $('again').onclick = go;
+  $('back').onclick = () => { document.body.classList.remove('show'); render(); };
+  $('save').onclick = saveEdit;
+  $('cancel').onclick = closeEdit;
+  $('delCls').onclick = () => {
+    if (!confirm('Klasse „' + cur().name + '“ mit allen Namen löschen?')) return;
+    S.classes = S.classes.filter(c => c.id !== S.cur); S.cur = S.classes[0].id; save(); closeEdit(); render();
+  };
+  addEventListener('resize', () => { if (document.body.classList.contains('show')) showResult(); });
+  addEventListener('keydown', e => {
+    if ($('dlg').classList.contains('open')) { if (e.key === 'Escape') closeEdit(); return; }
+    if (e.key === 'Escape') $('back').click();
+    if ((e.key === ' ' || e.key === 'Enter') && document.body.classList.contains('show')) { e.preventDefault(); go(); }
+  });
+
+  load(); render();
+
+  // Offline-Speicher: nur die App-Dateien, keine Namen
+  if ('serviceWorker' in navigator && window.isSecureContext) {
+    navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready).then(() => {
+      $('offline').textContent = '✓ Offline bereit – startet auch ohne Internet';
+      $('offline').className = 'ok';
+    }).catch(() => {});
+  }
+})();
+</script>
+</body>
+</html>
