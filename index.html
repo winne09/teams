@@ -213,6 +213,19 @@
   </div>
 </div>
 
+<div id="crop" class="full" style="z-index:40">
+  <div style="text-align:center;font-weight:700;font-size:18px;margin-bottom:8px">Ziehe einen Rahmen nur um die Namen</div>
+  <div id="cropBox" style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center">
+    <canvas id="cropCv" style="max-width:100%;max-height:100%;touch-action:none;border-radius:8px"></canvas>
+  </div>
+  <div class="bar">
+    <div class="tip">Ohne Rahmen wird das ganze Bild gelesen. Andere Spalten (Noten, Häkchen) besser weglassen.</div>
+    <button id="cropGo" class="acc">Namen lesen</button>
+    <button id="cropAll">Ganzes Bild</button>
+    <button id="cropCancel">Abbrechen</button>
+  </div>
+</div>
+
 <div id="dlg">
   <div class="box">
     <h2 id="dlgTitle">Namen bearbeiten</h2>
@@ -220,7 +233,7 @@
     <input type="text" id="clsName" placeholder="z. B. 7b Sport" autocomplete="off">
     <button id="photoBtn" class="acc" style="width:100%;margin-top:12px">📷 Namen aus Foto lesen</button>
     <input type="file" id="photoFile" accept="image/*" hidden>
-    <p class="hint" id="photoMsg">Foto oder Screenshot einer gedruckten Liste (z. B. aus dem Kursnotizbuch). Die Erkennung läuft nur auf diesem Gerät. Danach kurz prüfen.</p>
+    <p class="hint" id="photoMsg">Foto oder Screenshot einer gedruckten Liste (z. B. aus dem Kursnotizbuch). Danach einen Rahmen um die Namen ziehen. Die Erkennung läuft nur auf diesem Gerät.</p>
     <p class="hint">Oder: ein Name pro Zeile eintippen bzw. einfügen (Kursnotizbuch, Excel). Nummern, Leerzeilen und Überschriften werden entfernt, „Nachname, Vorname“ wird umgedreht.</p>
     <textarea id="names" placeholder="Anna&#10;Ben&#10;Can&#10;…" autocomplete="off" autocapitalize="words" spellcheck="false"></textarea>
     <div class="row" style="margin-top:8px">
@@ -635,44 +648,134 @@
     });
     return ocrLib;
   }
-  // Foto verkleinern (schneller) und in Graustufen umwandeln (besser lesbar)
-  function prepImage(file) {
+  // Foto laden
+  function loadImage(file) {
     return new Promise((ok, fail) => {
       const img = new Image(), url = URL.createObjectURL(file);
-      img.onload = () => {
-        const sc = Math.min(1, 2200 / Math.max(img.width, img.height));
-        const cv = document.createElement('canvas'); cv.width = Math.round(img.width * sc); cv.height = Math.round(img.height * sc);
-        const cx = cv.getContext('2d'); cx.filter = 'grayscale(1) contrast(1.3)'; cx.drawImage(img, 0, 0, cv.width, cv.height);
-        URL.revokeObjectURL(url); ok(cv);
-      };
+      img.onload = () => { URL.revokeObjectURL(url); ok(img); };
       img.onerror = () => { URL.revokeObjectURL(url); fail(); };
       img.src = url;
     });
   }
+  // Ausschnitt auf passende Größe bringen und in Schwarz/Weiß umwandeln.
+  // Die Schwelle wird für jede Stelle aus der Umgebung berechnet: so stören Schatten,
+  // Bildschirmflimmern und farbige Tabellenköpfe weniger.
+  function prepImage(img, r) {
+    const sc = Math.max(.5, Math.min(3, 2400 / Math.max(r.w, r.h)));
+    const W = Math.max(1, Math.round(r.w * sc)), H = Math.max(1, Math.round(r.h * sc));
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const cx = cv.getContext('2d'); cx.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, W, H);
+    const d = cx.getImageData(0, 0, W, H), p = d.data, g = new Float32Array(W * H);
+    for (let i = 0; i < W * H; i++) g[i] = .299 * p[4 * i] + .587 * p[4 * i + 1] + .114 * p[4 * i + 2];
+    const I = new Float64Array((W + 1) * (H + 1)), R = Math.max(8, Math.round(Math.max(W, H) / 40));
+    for (let y = 1; y <= H; y++) { let s = 0; for (let x = 1; x <= W; x++) { s += g[(y - 1) * W + x - 1]; I[y * (W + 1) + x] = I[(y - 1) * (W + 1) + x] + s; } }
+    for (let y = 0; y < H; y++) {
+      const y0 = Math.max(0, y - R), y1 = Math.min(H, y + R + 1);
+      for (let x = 0; x < W; x++) {
+        const x0 = Math.max(0, x - R), x1 = Math.min(W, x + R + 1);
+        const m = (I[y1 * (W + 1) + x1] - I[y0 * (W + 1) + x1] - I[y1 * (W + 1) + x0] + I[y0 * (W + 1) + x0]) / ((x1 - x0) * (y1 - y0));
+        const v = g[y * W + x] < m * .85 ? 0 : 255, k = 4 * (y * W + x);
+        p[k] = p[k + 1] = p[k + 2] = v;
+      }
+    }
+    cx.putImageData(d, 0, 0);
+    return cv;
+  }
+  // Erkannten Text in Namen umwandeln: Tabellenstriche, Zeilennummern und Krümel entfernen
+  const PART = /^(von|van|vom|zu|de|da|di|del|der|den|dos|du|el|al|bin|ibn|la|le)$/;
+  function ocrNames(text) {
+    const lines = text.replace(/ı/g, 'i').replace(/ſ/g, 's').split(/\r?\n/);
+    const out = [];
+    lines.forEach(line => {
+      const segs = line.split(/[|\[\]{}()_—–=\/\\*„"“”:;!?<>#+]+/);
+      let best = [];
+      segs.forEach(seg => {
+        // „Nachname, Vorname“: Komma merken, damit die Reihenfolge danach umgedreht wird
+        const toks = seg.trim().split(/\s+/).map(t => ({ w:t.replace(/^[.,'’‚-]+|[.,'’‚-]+$/g, ''), c:/,$/.test(t) }))
+          .filter(t => /^\p{Lu}[\p{Ll}ß'’-]+$/u.test(t.w) || PART.test(t.w));
+        const len = a => a.map(t => t.w).join('').length;
+        if (len(toks) > len(best)) best = toks;
+      });
+      while (best.length && PART.test(best[best.length - 1].w)) best.pop();
+      if (best.length >= 3 && best[best.length - 1].w.length <= 2) best.pop(); // Krümel am Zeilenende, z. B. „Se“
+      if (!best.length || best.length > 4) return;
+      const n = best.map((t, i) => t.w + (t.c && i < best.length - 1 ? ',' : '')).join(' ');
+      if (n.replace(/[^\p{L}]/gu, '').length < 3 || HEAD.test(n) || best.every(t => HEAD.test(t.w))) return;
+      out.push(n);
+    });
+    return cleanNames(out.join('\n'));
+  }
+
+  // Ausschnitt wählen: Rahmen um die Namensspalte ziehen
+  let cropImg = null, cropR = null, cropDrag = null;
+  function cropScale() { const c = $('cropCv'); return c.width / cropImg.width; }
+  function drawCrop() {
+    const c = $('cropCv'), cx = c.getContext('2d'), k = cropScale();
+    cx.drawImage(cropImg, 0, 0, c.width, c.height);
+    if (!cropR) return;
+    cx.fillStyle = 'rgba(0,0,0,.55)';
+    const x = cropR.x * k, y = cropR.y * k, w = cropR.w * k, h = cropR.h * k;
+    cx.fillRect(0, 0, c.width, y); cx.fillRect(0, y + h, c.width, c.height - y - h);
+    cx.fillRect(0, y, x, h); cx.fillRect(x + w, y, c.width - x - w, h);
+    cx.strokeStyle = '#ffb020'; cx.lineWidth = 3; cx.strokeRect(x, y, w, h);
+  }
+  function openCrop(img) {
+    cropImg = img; cropR = null;
+    $('crop').classList.add('open'); document.body.classList.add('lock');
+    const box = $('cropBox'), c = $('cropCv');
+    const k = Math.min(box.clientWidth / img.width, box.clientHeight / img.height);
+    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    drawCrop();
+  }
+  function closeCrop() { $('crop').classList.remove('open'); document.body.classList.remove('lock'); cropImg = null; }
+  function cropPt(e) {
+    const c = $('cropCv'), b = c.getBoundingClientRect(), k = cropScale();
+    return { x:Math.max(0, Math.min(cropImg.width, (e.clientX - b.left) * (c.width / b.width) / k)),
+             y:Math.max(0, Math.min(cropImg.height, (e.clientY - b.top) * (c.height / b.height) / k)) };
+  }
+  $('cropCv').addEventListener('pointerdown', e => { e.preventDefault(); $('cropCv').setPointerCapture(e.pointerId); cropDrag = cropPt(e); });
+  $('cropCv').addEventListener('pointermove', e => {
+    if (!cropDrag) return; const q = cropPt(e);
+    cropR = { x:Math.min(cropDrag.x, q.x), y:Math.min(cropDrag.y, q.y), w:Math.abs(q.x - cropDrag.x), h:Math.abs(q.y - cropDrag.y) };
+    drawCrop();
+  });
+  $('cropCv').addEventListener('pointerup', () => { cropDrag = null; if (cropR && (cropR.w < 20 || cropR.h < 20)) { cropR = null; drawCrop(); } });
+  $('cropCancel').onclick = closeCrop;
+  $('cropAll').onclick = () => { cropR = null; drawCrop(); };
+  $('cropGo').onclick = () => {
+    const img = cropImg, r = cropR || { x:0, y:0, w:img.width, h:img.height };
+    closeCrop(); readNames(img, r);
+  };
+
   const photoMsg = t => { $('photoMsg').textContent = t; };
   $('photoBtn').onclick = () => $('photoFile').click();
   $('photoFile').onchange = async e => {
     const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    try { openCrop(await loadImage(f)); loadOcr().catch(() => {}); }
+    catch (err) { photoMsg('Dieses Bild ließ sich nicht öffnen.'); }
+  };
+  async function readNames(img, r) {
     const btn = $('photoBtn'); btn.disabled = true;
     let worker;
     try {
       photoMsg('Texterkennung wird geladen …');
       const T = await loadOcr();
-      const cv = await prepImage(f);
+      const cv = prepImage(img, r);
       worker = await T.createWorker('deu', 1, {
         workerPath: OCR + 'worker.min.js', corePath: OCR, langPath: OCR, gzip: true, workerBlobURL: false,
         logger: m => { if (m.status === 'recognizing text') photoMsg('Lese Namen … ' + Math.round(m.progress * 100) + ' %'); }
       });
+      await worker.setParameters({ tessedit_pageseg_mode: '4' }); // eine Spalte mit Zeilen
       const { data } = await worker.recognize(cv);
-      const names = cleanNames(data.text).filter(n => /^\p{L}[\p{L} .'’-]*\p{L}\.?$/u.test(n) && n.split(' ').length <= 4);
-      if (!names.length) { photoMsg('Keine Namen erkannt. Tipp: Liste gerade und hell fotografieren oder einen Screenshot nehmen.'); return; }
+      const names = ocrNames(data.text);
+      if (!names.length) { photoMsg('Keine Namen erkannt. Tipp: Rahmen nur um die Namen ziehen, Liste gerade und hell fotografieren oder einen Screenshot nehmen.'); return; }
       const old = $('names').value.trim();
       $('names').value = cleanNames((old ? old + '\n' : '') + names.join('\n')).join('\n');
-      photoMsg('✓ ' + names.length + ' Namen erkannt. Bitte kurz prüfen und Fehler korrigieren.');
+      photoMsg('✓ ' + names.length + ' Namen erkannt. Bitte kurz prüfen und Tippfehler korrigieren.');
     } catch (err) {
       photoMsg('Das hat nicht geklappt. Beim ersten Mal braucht die Texterkennung Internet (ca. 9 MB), danach geht es offline.');
     } finally { if (worker) worker.terminate(); btn.disabled = false; }
-  };
+  }
 
   // ---------- Datei sichern / laden ----------
   function flash(t) { $('msg').textContent = t; setTimeout(() => { if ($('msg').textContent === t) $('msg').textContent = ''; }, 5000); }
