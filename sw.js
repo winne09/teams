@@ -9,7 +9,8 @@ const FILES = [
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  './icons/apple-touch-icon.png'
+  './icons/apple-touch-icon.png',
+  './lib/qrcode.js'
 ];
 // Texterkennung für „Namen aus Foto“ (ca. 9 MB): wird beim ersten Start im Hintergrund
 // mitgeladen, damit sie auch in der Halle ohne Internet funktioniert.
