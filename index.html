@@ -85,7 +85,8 @@
   .team { border-radius:16px; background:var(--card); border:3px solid var(--c); display:flex; flex-direction:column; min-height:0; overflow:hidden; }
   .team h3 { margin:0; background:var(--c); color:var(--t); padding:.2em .5em .25em; font-size:1.1em; line-height:1.15; }
   .team h3 span, .team h3 small { display:block; white-space:nowrap; overflow:hidden; }
-  .team h3 small { font-size:.68em; font-weight:700; opacity:.85; }
+  .team h3 small { font-size:.68em; font-weight:700; opacity:.85; white-space:normal; }
+  .team h3 small i { font-style:normal; white-space:nowrap; }
   .team.drop { cursor:pointer; outline:3px dashed var(--acc); outline-offset:-8px; }
   .team ul { list-style:none; margin:0; padding:.25em .5em; flex:1; overflow:hidden; }
   .team li { padding:.12em .3em; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:8px; cursor:pointer; }
@@ -581,7 +582,9 @@
       const h = document.createElement('h3'); h.innerHTML = '<span></span><small></small>';
       h.firstChild.textContent = 'Team ' + name;
       const sum = t.m.reduce((a, n) => a + (lvOf.get(n) || 3), 0);
-      h.lastChild.textContent = (showField ? t.f + ' · ' : '') + t.m.length + ' Spieler' + (showStr ? ' · ★ ' + sum : '');
+      // Teile dürfen in eine zweite Zeile rutschen, statt die ganze Schrift zu verkleinern
+      const parts = (showField ? [t.f] : []).concat(t.m.length + ' Spieler', showStr ? ['★ ' + sum + ' · Ø ' + (sum / Math.max(1, t.m.length)).toFixed(1).replace('.', ',')] : []);
+      parts.forEach((x, i) => { const sp = document.createElement('i'); sp.textContent = (i ? ' · ' : '') + x; h.lastChild.appendChild(sp); });
       if (showStr) h.lastChild.title = 'Stärke ' + sum + ' (Ø ' + (sum / Math.max(1, t.m.length)).toFixed(1).replace('.', ',') + ')';
       const ul = document.createElement('ul');
       t.m.forEach((nm, pi) => {
