@@ -83,11 +83,14 @@
   .full.open { display:flex; } body.lock { overflow:hidden; }
   #teams { flex:1; display:grid; gap:10px; min-height:0; }
   .team { border-radius:16px; background:var(--card); border:3px solid var(--c); display:flex; flex-direction:column; min-height:0; overflow:hidden; }
-  .team h3 { margin:0; background:var(--c); color:var(--t); padding:.25em .5em; font-size:1.1em; display:flex; justify-content:space-between; gap:.5em; white-space:nowrap; }
-  .team h3 small { font-weight:600; opacity:.8; }
+  .team h3 { margin:0; background:var(--c); color:var(--t); padding:.2em .5em .25em; font-size:1.1em; line-height:1.15; }
+  .team h3 span, .team h3 small { display:block; white-space:nowrap; overflow:hidden; }
+  .team h3 small { font-size:.68em; font-weight:700; opacity:.85; }
+  .team.drop { cursor:pointer; outline:3px dashed var(--acc); outline-offset:-8px; }
   .team ul { list-style:none; margin:0; padding:.25em .5em; flex:1; overflow:hidden; }
   .team li { padding:.12em .3em; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:8px; cursor:pointer; }
   .team li.sel { background:var(--acc); color:#111; }
+  #teams.wrapn .team li { white-space:normal; overflow-wrap:anywhere; line-height:1.15; padding:.18em .3em; }
   .bar { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
   .bar button { flex:1; min-height:56px; font-size:18px; font-weight:700; }
   .bar .tip { width:100%; text-align:center; color:var(--mut); font-size:14px; }
@@ -108,7 +111,7 @@
   #offline.ok { color:#86efac; }
   #msg { text-align:center; color:#86efac; font-weight:600; min-height:1.2em; margin-top:8px; }
   footer { color:var(--mut); font-size:13px; text-align:center; line-height:1.5; }
-  @media (prefers-reduced-motion: no-preference) { .team { animation:pop .25s ease-out both; } }
+  @media (prefers-reduced-motion: no-preference) { #teams.anim .team { animation:pop .25s ease-out both; } }
   @keyframes pop { from { transform:scale(.96); opacity:0; } }
 </style>
 </head>
@@ -200,7 +203,7 @@
   <div id="teams"></div>
   <div class="bar">
     <div id="warn"></div>
-    <div class="tip">Tipp: zwei Namen nacheinander antippen, um sie zu tauschen.</div>
+    <div class="tip" id="rtip">Tipp: Namen antippen, dann einen anderen Namen (tauschen) oder ein anderes Team (verschieben).</div>
     <button id="again" class="acc">🔀 Neu mischen</button>
     <button id="strBtn" class="tog" aria-label="Teamstärke anzeigen oder ausblenden">★ Stärke</button>
     <button id="back">‹ Zurück</button>
@@ -480,7 +483,9 @@
 
   // ---------- Ergebnis ----------
   let result = [], sel = null;
+  let animNext = false; // nur neue Einteilungen einblenden, nicht jedes Antippen
   function showResult() {
+    $('teams').classList.toggle('anim', animNext); animNext = false;
     const box = $('teams'), k = result.length;
     const landscape = innerWidth > innerHeight;
     let cols = k <= 2 ? k : k <= 4 ? 2 : k <= 6 ? 3 : 4;
@@ -504,7 +509,7 @@
       const h = document.createElement('h3'); h.innerHTML = '<span></span><small></small>';
       h.firstChild.textContent = 'Team ' + name;
       const sum = t.m.reduce((a, n) => a + (lvOf.get(n) || 3), 0);
-      h.lastChild.textContent = (showField ? t.f + ' · ' : '') + t.m.length + (showStr ? ' · ★' + sum : '');
+      h.lastChild.textContent = (showField ? t.f + ' · ' : '') + t.m.length + ' Spieler' + (showStr ? ' · ★ ' + sum : '');
       if (showStr) h.lastChild.title = 'Stärke ' + sum + ' (Ø ' + (sum / Math.max(1, t.m.length)).toFixed(1).replace('.', ',') + ')';
       const ul = document.createElement('ul');
       t.m.forEach((nm, pi) => {
@@ -513,23 +518,37 @@
         li.onclick = () => tap(ti, pi);
         ul.appendChild(li);
       });
+      if (sel && sel[0] !== ti) d.classList.add('drop');
+      d.onclick = e => { if (sel && sel[0] !== ti && !e.target.closest('li')) move(ti); };
       d.append(h, ul); box.appendChild(d);
     });
+    $('rtip').textContent = sel ? 'Jetzt anderen Namen antippen (tauschen) oder ein anderes Team (verschieben).'
+      : 'Tipp: Namen antippen, dann einen anderen Namen (tauschen) oder ein anderes Team (verschieben).';
     $('warn').textContent = lastBad ? '„Nie zusammen“ ließ sich nicht ganz einhalten – bitte prüfen oder tauschen.' : '';
     fit();
   }
   // Schrift so groß wie möglich, ohne dass Namen abgeschnitten werden
   function fit() {
     const box = $('teams'), teams = [...box.children];
+    box.classList.remove('wrapn');
+    let size = fitSize(box, teams);
+    // Lange Namen auf schmalen Handys: lieber umbrechen als winzig schreiben
+    if (size < 18) { box.classList.add('wrapn'); const s2 = fitSize(box, teams); if (s2 > size) size = s2; else box.classList.remove('wrapn'); }
+    box.style.fontSize = size + 'px';
+  }
+  function fitSize(box, teams) {
     let lo = 12, hi = 96;
-    const ok = () => teams.every(t => { const ul = t.querySelector('ul'), h = t.querySelector('h3');
-      return ul.scrollHeight <= ul.clientHeight + 1 && h.scrollWidth <= h.clientWidth + 1 &&
+    const ok = () => teams.every(t => { const ul = t.querySelector('ul');
+      return ul.scrollHeight <= ul.clientHeight + 1 && [...t.querySelectorAll('h3 > *')].every(x => x.scrollWidth <= x.clientWidth + 1) &&
         [...ul.children].every(li => li.scrollWidth <= li.clientWidth + 1); });
     while (hi - lo > 1) {
       const mid = (lo + hi) >> 1; box.style.fontSize = mid + 'px';
       if (ok()) lo = mid; else hi = mid;
     }
-    box.style.fontSize = lo + 'px';
+    return lo;
+  }
+  function move(ti) { // ausgewählten Namen in ein anderes Team verschieben
+    const [fi, fp] = sel; const [n] = result[fi].m.splice(fp, 1); result[ti].m.push(n); sel = null; showResult();
   }
   function tap(ti, pi) {
     if (!sel) sel = [ti, pi];
@@ -541,7 +560,7 @@
   function closeFull() { document.querySelectorAll('.full').forEach(f => f.classList.remove('open')); document.body.classList.remove('lock'); render(); }
   function go() {
     if (present().length < 2) return;
-    result = makeTeams(); sel = null;
+    result = makeTeams(); sel = null; animNext = true;
     openFull('result'); showResult();
   }
 
