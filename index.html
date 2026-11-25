@@ -153,6 +153,23 @@
   .side .row { flex-wrap:nowrap; }
   .side button { width:64px; min-height:56px; font-size:30px; font-weight:800; padding:0; }
   .sides .colon { font-size:48px; font-weight:800; color:var(--mut); }
+  /* Selbst einteilen */
+  #manHead { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  #manHead .ttl { font-size:20px; font-weight:800; flex:1; min-width:140px; }
+  #manHead .num { font-size:28px; min-width:44px; }
+  #manHead button.round { width:50px; min-height:50px; }
+  #manSum { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+  #manSum span { background:var(--c); color:var(--t); border-radius:10px; padding:4px 10px; font-weight:800; font-size:14px; white-space:nowrap; }
+  #manSum span.none { background:var(--card2); color:var(--mut); }
+  #manList { flex:1; min-height:0; overflow:auto; -webkit-overflow-scrolling:touch; display:grid; gap:6px; align-content:start;
+    grid-template-columns:repeat(auto-fill,minmax(380px,1fr)); }
+  .mr { display:flex; align-items:center; gap:8px; background:var(--card); border:1px solid #27272a; border-radius:12px; padding:5px 6px 5px 12px; }
+  .mr .nm { flex:1; min-width:0; font-size:17px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mr .tb { display:flex; flex-wrap:wrap; gap:5px; justify-content:flex-end; }
+  .mr .tb button { width:42px; min-height:42px; padding:0; border-radius:50%; background:var(--c); border:3px solid transparent; opacity:.3;
+    color:var(--t); font-size:15px; font-weight:800; }
+  .mr .tb button.on { opacity:1; border-color:#fff; }
+  .mr.set .nm { color:var(--fg); } .mr:not(.set) .nm { color:var(--mut); }
   @media (prefers-reduced-motion: no-preference) { #teams.anim .team { animation:pop .25s ease-out both; } }
   @keyframes pop { from { transform:scale(.96); opacity:0; } }
 </style>
@@ -201,6 +218,7 @@
   </section>
 
   <button class="big acc" id="go">Teams bilden</button>
+  <button id="manBtn" style="width:100%;margin-top:10px">✋ Selbst einteilen</button>
   <button id="lastBtn" style="width:100%;margin-top:10px;display:none"></button>
 
   <section class="box" style="margin-top:14px">
@@ -279,6 +297,23 @@
       <button id="scoreClear" class="grow">Ergebnis löschen</button>
       <button id="scoreCancel" class="grow">Abbrechen</button>
     </div>
+  </div>
+</div>
+
+<div id="manual" class="full">
+  <div id="manHead">
+    <div class="ttl">✋ Selbst einteilen</div>
+    <button class="round" id="manMinus" aria-label="ein Team weniger">−</button>
+    <div class="num" id="manK">2</div>
+    <button class="round" id="manPlus" aria-label="ein Team mehr">+</button>
+  </div>
+  <div id="manSum"></div>
+  <div id="manList"></div>
+  <div class="bar">
+    <div class="tip">Hinter jedem Namen die Teamfarbe antippen. Die Einteilung bleibt für diese Klasse gespeichert.</div>
+    <button id="manGo" class="acc">✓ Teams anzeigen</button>
+    <button id="manClear">Leeren</button>
+    <button id="manBack">‹ Zurück</button>
   </div>
 </div>
 
@@ -381,6 +416,8 @@
     c.st = (c.st || []).filter(s => s && s.n).map(s => ({ n:String(s.n), lv:+s.lv || 0, g:s.g === 'w' || s.g === 'm' ? s.g : '', tw:!!s.tw, abs:!!s.abs }));
     const names = new Set(c.st.map(s => s.n));
     c.apart = (c.apart || []).filter(p => Array.isArray(p) && names.has(p[0]) && names.has(p[1]) && p[0] !== p[1]);
+    const man = {}; Object.entries(c.man && typeof c.man === 'object' ? c.man : {}).forEach(([n, t]) => { if (names.has(n) && t >= 0 && t < MAXT) man[n] = +t; });
+    c.man = man;
     return c;
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
@@ -445,6 +482,7 @@
     $('preview').textContent = pv;
     $('go').disabled = n < 2; $('go').style.opacity = n < 2 ? .4 : 1;
     $('drawBtn').disabled = n < 1;
+    $('manBtn').disabled = n < 2;
   }
 
   // ---------- Verteilung ----------
@@ -780,6 +818,67 @@
     const L = S.last; result = L.result; plan = L.plan || null; lastBad = 0; sel = null; animNext = true;
     closePick(); openFull('result'); showResult();
   };
+
+  // ---------- Selbst einteilen ----------
+  let manK = 2;
+  function openManual() {
+    const c = cur(), pl = present();
+    if (pl.length < 2) return;
+    fixClass(c);
+    const used = pl.map(s => c.man[s.n]).filter(t => t !== undefined);
+    manK = Math.max(2, teamCount(pl.length), used.length ? Math.max(...used) + 1 : 0);
+    closePick(); openFull('manual'); showManual();
+    $('manList').scrollTop = 0;
+  }
+  function showManual() {
+    const c = cur(), pl = present(), list = $('manList'), top = list.scrollTop;
+    $('manK').textContent = manK;
+    const hasLv = c.st.some(s => s.lv);
+    const cnt = Array.from({ length:manK }, () => [0, 0]); let none = 0;
+    pl.forEach(s => { const t = c.man[s.n]; if (t === undefined || t >= manK) none++; else { cnt[t][0]++; cnt[t][1] += s.lv || 3; } });
+    const sum = $('manSum'); sum.innerHTML = '';
+    cnt.forEach(([n, st], t) => {
+      const x = document.createElement('span'); x.style.setProperty('--c', COLORS[t][1]); x.style.setProperty('--t', COLORS[t][2]);
+      x.textContent = COLORS[t][0] + ' ' + n + (hasLv && n ? ' · ★ ' + st + ' · Ø ' + (st / n).toFixed(1).replace('.', ',') : '');
+      sum.appendChild(x);
+    });
+    if (none) { const x = document.createElement('span'); x.className = 'none'; x.textContent = none + ' ohne Team'; sum.appendChild(x); }
+    list.innerHTML = '';
+    pl.forEach(s => {
+      const t = c.man[s.n], r = document.createElement('div'); r.className = 'mr' + (t !== undefined && t < manK ? ' set' : '');
+      const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = s.n;
+      const tb = document.createElement('div'); tb.className = 'tb';
+      for (let i = 0; i < manK; i++) {
+        const b = document.createElement('button'); b.textContent = i + 1;
+        b.style.setProperty('--c', COLORS[i][1]); b.style.setProperty('--t', COLORS[i][2]);
+        b.setAttribute('aria-label', s.n + ' in Team ' + COLORS[i][0]);
+        if (t === i) b.className = 'on';
+        b.onclick = () => { if (c.man[s.n] === i) delete c.man[s.n]; else c.man[s.n] = i; save(); showManual(); };
+        tb.appendChild(b);
+      }
+      r.append(nm, tb); list.appendChild(r);
+    });
+    list.scrollTop = top;
+  }
+  function manStep(d) {
+    manK = Math.max(2, Math.min(MAXT, manK + d));
+    showManual();
+  }
+  function manGo() {
+    const c = cur(), pl = present();
+    const none = pl.filter(s => !(c.man[s.n] < manK)).length;
+    if (none && !confirm(none + (none === 1 ? ' Kind hat' : ' Kinder haben') + ' noch kein Team. Trotzdem anzeigen?')) return;
+    result = Array.from({ length:manK }, () => ({ m:[], f:'', fi:0 }));
+    pl.forEach(s => { const t = c.man[s.n]; if (t < manK) result[t].m.push(s.n); });
+    lastBad = 0; sel = null; animNext = true; plan = null;
+    $('manual').classList.remove('open'); openFull('result'); showResult();
+  }
+  $('manBtn').onclick = openManual;
+  $('manMinus').onclick = () => manStep(-1);
+  $('manPlus').onclick = () => manStep(1);
+  $('manGo').onclick = manGo;
+  $('manClear').onclick = () => { if (confirm('Eigene Einteilung dieser Klasse löschen?')) { cur().man = {}; save(); showManual(); } };
+  $('manBack').onclick = closeFull;
 
   // ---------- Name ziehen (ohne Wiederholung, bis alle dran waren) ----------
   let drawn = new Set(), drawCls = null;
@@ -1187,6 +1286,7 @@
     if (pi >= 0 && e.key === 'Escape') { closePick(); return; }
     if (scoring >= 0) { if (e.key === 'Escape') closeScore(); if (e.key === 'Enter') setScore(sa, sb); return; }
     if ($('plan').classList.contains('open')) { if (e.key === 'Escape') $('planBack').click(); return; }
+    if ($('manual').classList.contains('open')) { if (e.key === 'Escape') closeFull(); return; }
     const res = $('result').classList.contains('open'), dr = $('draw').classList.contains('open');
     if (e.key === 'Escape' && (res || dr)) closeFull();
     if ((e.key === ' ' || e.key === 'Enter') && (res || dr)) { e.preventDefault(); res ? go() : drawNext(); }
