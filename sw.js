@@ -2,14 +2,15 @@
 // Legt nur die App-Dateien auf dem Gerät ab. Die Namen liegen getrennt im
 // Browser-Speicher des Geräts und werden nie übertragen.
 // Bei jeder Änderung an der App: CACHE-Version erhöhen.
-const CACHE = 'teams-v2.3';
+const CACHE = 'teams-v2.4';
 const FILES = [
   './',
   './index.html',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  './icons/apple-touch-icon.png'
+  './icons/apple-touch-icon.png',
+  './lib/qrcode.js'
 ];
 // Texterkennung für „Namen aus Foto“ (ca. 9 MB): wird beim ersten Start im Hintergrund
 // mitgeladen, damit sie auch in der Halle ohne Internet funktioniert.

@@ -158,13 +158,15 @@
   <button class="big acc" id="go">Teams bilden</button>
 
   <section class="box" style="margin-top:14px">
-    <h2>Handy ↔ iPad</h2>
+    <h2>Laptop ↔ Handy ↔ iPad</h2>
+    <button id="qrBtn" class="acc" style="width:100%;margin-bottom:8px">📲 Klasse per QR-Code übertragen</button>
     <div class="row">
       <button id="exportBtn" class="small grow">⬇ Klassen als Datei sichern</button>
       <button id="importBtn" class="small grow">⬆ Datei laden</button>
       <input type="file" id="importFile" accept=".json,.csv,.txt,application/json,text/csv,text/plain" hidden>
     </div>
-    <p class="hint">Die Datei kannst du z. B. per AirDrop, USB oder Schul-Cloud auf das andere Gerät bringen und dort laden. „Datei laden“ nimmt auch Namenslisten als .csv oder .txt (z. B. aus Excel).</p>
+    <p class="hint">QR-Code: Am Laptop öffnen, mit der Kamera des anderen Geräts scannen – fertig. Die Namen stecken nur im Code, nichts geht übers Internet.<br>
+      Datei: z. B. per AirDrop, USB oder Schul-Cloud auf das andere Gerät bringen und dort laden. „Datei laden“ nimmt auch Namenslisten als .csv oder .txt (z. B. aus Excel).</p>
     <div id="msg" role="status"></div>
   </section>
 
@@ -200,6 +202,7 @@
     <div id="warn"></div>
     <div class="tip">Tipp: zwei Namen nacheinander antippen, um sie zu tauschen.</div>
     <button id="again" class="acc">🔀 Neu mischen</button>
+    <button id="strBtn" class="tog" aria-label="Teamstärke anzeigen oder ausblenden">★ Stärke</button>
     <button id="back">‹ Zurück</button>
   </div>
 </div>
@@ -210,6 +213,19 @@
   <div class="bar">
     <button id="drawNext" class="acc">🎲 Nächster</button>
     <button id="drawBack">‹ Zurück</button>
+  </div>
+</div>
+
+<div id="qr" class="full" style="z-index:40;align-items:center">
+  <div style="font-weight:800;font-size:22px;margin:6px 0" id="qrTitle"></div>
+  <div style="color:var(--mut);text-align:center;max-width:520px">Mit der Kamera des Handys oder iPads scannen und den Link öffnen. Die Klasse wird dort übernommen.</div>
+  <div style="flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;padding:12px">
+    <canvas id="qrCv" style="background:#fff;border-radius:12px;max-width:100%;max-height:100%;image-rendering:pixelated"></canvas>
+  </div>
+  <div style="color:var(--mut);text-align:center;font-size:14px;max-width:560px">iPad/iPhone: Der Link öffnet sich in Safari. Wenn du die App vom Home-Bildschirm nutzt, dort die Klasse per Datei laden.</div>
+  <div class="bar" style="width:100%">
+    <select id="qrCls" class="grow" aria-label="Klasse wählen"></select>
+    <button id="qrClose">‹ Zurück</button>
   </div>
 </div>
 
@@ -475,13 +491,21 @@
     box.style.gridTemplateRows = 'repeat(' + Math.ceil(k / cols) + ',minmax(0,1fr))';
     box.innerHTML = '';
     const showField = result.some(t => t.f);
+    // Teamstärke: Summe der Sterne (ohne Angabe = 3), mit Ausblenden-Knopf für den Beamer
+    const lvOf = new Map(cur().st.map(s => [s.n, s.lv || 3]));
+    const hasLv = cur().st.some(s => s.lv);
+    const showStr = hasLv && S.showStr !== false;
+    $('strBtn').style.display = hasLv ? '' : 'none';
+    $('strBtn').classList.toggle('on', showStr);
     result.forEach((t, ti) => {
       const [name, c, tc] = COLORS[ti];
       const d = document.createElement('div'); d.className = 'team';
       d.style.setProperty('--c', c); d.style.setProperty('--t', tc);
       const h = document.createElement('h3'); h.innerHTML = '<span></span><small></small>';
       h.firstChild.textContent = 'Team ' + name;
-      h.lastChild.textContent = (showField ? t.f + ' · ' : '') + t.m.length;
+      const sum = t.m.reduce((a, n) => a + (lvOf.get(n) || 3), 0);
+      h.lastChild.textContent = (showField ? t.f + ' · ' : '') + t.m.length + (showStr ? ' · ★' + sum : '');
+      if (showStr) h.lastChild.title = 'Stärke ' + sum + ' (Ø ' + (sum / Math.max(1, t.m.length)).toFixed(1).replace('.', ',') + ')';
       const ul = document.createElement('ul');
       t.m.forEach((nm, pi) => {
         const li = document.createElement('li'); li.textContent = nm;
@@ -777,6 +801,73 @@
     } finally { if (worker) worker.terminate(); btn.disabled = false; }
   }
 
+  // ---------- Übertragen per QR-Code ----------
+  // Die Klasse steckt komprimiert im Teil hinter „#“ der Adresse. Dieser Teil wird vom Browser
+  // nie an den Server geschickt – die Namen bleiben also zwischen den beiden Geräten.
+  const b64u = bytes => { let s = ''; bytes.forEach(b => s += String.fromCharCode(b)); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+  const unb64u = t => Uint8Array.from(atob(t.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+  async function pipe(bytes, stream) { return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer()); }
+  async function packClass(c) {
+    const data = JSON.stringify({ n:c.name, s:c.st.map(x => [x.n, x.lv || 0, x.g || '', x.tw ? 1 : 0]), a:c.apart });
+    const raw = new TextEncoder().encode(data);
+    if (window.CompressionStream) { try { return 'z' + b64u(await pipe(raw, new CompressionStream('deflate-raw'))); } catch (e) {} }
+    return 'j' + b64u(raw);
+  }
+  async function unpackClass(t) {
+    let bytes = unb64u(t.slice(1));
+    if (t[0] === 'z') bytes = await pipe(bytes, new DecompressionStream('deflate-raw'));
+    const d = JSON.parse(new TextDecoder().decode(bytes));
+    return fixClass({ name:String(d.n || 'Klasse'), st:(d.s || []).map(x => ({ n:x[0], lv:x[1], g:x[2], tw:!!x[3], abs:false })), apart:d.a || [] });
+  }
+  let qrLib = null;
+  function loadQr() {
+    if (!qrLib) qrLib = new Promise((ok, fail) => {
+      const sc = document.createElement('script'); sc.src = 'lib/qrcode.js';
+      sc.onload = () => ok(window.qrcode); sc.onerror = () => { qrLib = null; fail(); };
+      document.head.appendChild(sc);
+    });
+    return qrLib;
+  }
+  async function drawQr() {
+    const c = S.classes.find(x => x.id === $('qrCls').value) || cur();
+    $('qrTitle').textContent = c.name + ' · ' + c.st.length + ' Namen';
+    const url = location.href.split('#')[0] + '#k=' + await packClass(c);
+    const qr = (await loadQr())(0, 'L'); qr.addData(url, 'Byte'); qr.make();
+    const n = qr.getModuleCount(), q = 4, cv = $('qrCv'), px = Math.max(4, Math.floor(900 / (n + 2 * q)));
+    cv.width = cv.height = (n + 2 * q) * px;
+    const cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.fillStyle = '#000';
+    for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (qr.isDark(r, k)) cx.fillRect((k + q) * px, (r + q) * px, px, px);
+  }
+  $('qrBtn').onclick = async () => {
+    const sel = $('qrCls'); sel.innerHTML = '';
+    S.classes.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; sel.appendChild(o); });
+    sel.value = S.cur;
+    openFull('qr');
+    try { await drawQr(); } catch (e) { closeFull(); flash('Der QR-Code konnte nicht erstellt werden (zu viele Namen?). Bitte per Datei übertragen.'); }
+  };
+  $('qrCls').onchange = () => drawQr().catch(() => flash('Der QR-Code konnte nicht erstellt werden.'));
+  $('qrClose').onclick = closeFull;
+  async function importFromLink() {
+    const m = location.hash.match(/^#k=([A-Za-z0-9_-]+)$/);
+    if (!m) return;
+    history.replaceState(null, '', location.pathname + location.search); // Namen nicht in der Adresse lassen
+    try {
+      const c = await unpackClass(m[1]);
+      const ex = S.classes.find(x => x.name === c.name);
+      if (ex) {
+        if (!confirm('Die Klasse „' + c.name + '“ gibt es hier schon. Durch die neue Liste ersetzen?')) return;
+        ex.st = c.st; ex.apart = c.apart; S.cur = ex.id;
+      } else {
+        c.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        S.classes = S.classes.filter(x => x.st.length || x.name !== 'Meine Klasse');
+        S.classes.push(c); S.cur = c.id;
+      }
+      save(); render();
+      flash('✓ Klasse „' + c.name + '“ übernommen (' + c.st.length + ' Namen)');
+      $('msg').scrollIntoView({ block:'center' });
+    } catch (e) { flash('Dieser QR-Code ließ sich nicht lesen.'); }
+  }
+
   // ---------- Datei sichern / laden ----------
   function flash(t) { $('msg').textContent = t; setTimeout(() => { if ($('msg').textContent === t) $('msg').textContent = ''; }, 5000); }
   $('exportBtn').onclick = () => {
@@ -843,6 +934,7 @@
   $('minus').onclick = () => step(-1); $('plus').onclick = () => step(1);
   $('go').onclick = () => { closePick(); go(); };
   $('again').onclick = go;
+  $('strBtn').onclick = () => { S.showStr = S.showStr === false; save(); showResult(); };
   $('back').onclick = closeFull;
   $('drawBtn').onclick = () => { closePick(); openFull('draw'); drawNext(); };
   $('drawNext').onclick = drawNext;
@@ -862,7 +954,8 @@
     if ((e.key === ' ' || e.key === 'Enter') && (res || dr)) { e.preventDefault(); res ? go() : drawNext(); }
   });
 
-  load(); render();
+  load(); render(); importFromLink();
+  addEventListener('hashchange', importFromLink);
 
   // Offline-Speicher: nur die App-Dateien, keine Namen
   if ('serviceWorker' in navigator && window.isSecureContext) {
