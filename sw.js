@@ -2,7 +2,7 @@
 // Legt nur die App-Dateien auf dem Gerät ab. Die Namen liegen getrennt im
 // Browser-Speicher des Geräts und werden nie übertragen.
 // Bei jeder Änderung an der App: CACHE-Version erhöhen.
-const CACHE = 'teams-v2.4';
+const CACHE = 'teams-v2.6';
 const FILES = [
   './',
   './index.html',
