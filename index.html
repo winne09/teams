@@ -200,6 +200,7 @@
     <div id="warn"></div>
     <div class="tip">Tipp: zwei Namen nacheinander antippen, um sie zu tauschen.</div>
     <button id="again" class="acc">🔀 Neu mischen</button>
+    <button id="strBtn" class="tog" aria-label="Teamstärke anzeigen oder ausblenden">★ Stärke</button>
     <button id="back">‹ Zurück</button>
   </div>
 </div>
@@ -475,13 +476,21 @@
     box.style.gridTemplateRows = 'repeat(' + Math.ceil(k / cols) + ',minmax(0,1fr))';
     box.innerHTML = '';
     const showField = result.some(t => t.f);
+    // Teamstärke: Summe der Sterne (ohne Angabe = 3), mit Ausblenden-Knopf für den Beamer
+    const lvOf = new Map(cur().st.map(s => [s.n, s.lv || 3]));
+    const hasLv = cur().st.some(s => s.lv);
+    const showStr = hasLv && S.showStr !== false;
+    $('strBtn').style.display = hasLv ? '' : 'none';
+    $('strBtn').classList.toggle('on', showStr);
     result.forEach((t, ti) => {
       const [name, c, tc] = COLORS[ti];
       const d = document.createElement('div'); d.className = 'team';
       d.style.setProperty('--c', c); d.style.setProperty('--t', tc);
       const h = document.createElement('h3'); h.innerHTML = '<span></span><small></small>';
       h.firstChild.textContent = 'Team ' + name;
-      h.lastChild.textContent = (showField ? t.f + ' · ' : '') + t.m.length;
+      const sum = t.m.reduce((a, n) => a + (lvOf.get(n) || 3), 0);
+      h.lastChild.textContent = (showField ? t.f + ' · ' : '') + t.m.length + (showStr ? ' · ★' + sum : '');
+      if (showStr) h.lastChild.title = 'Stärke ' + sum + ' (Ø ' + (sum / Math.max(1, t.m.length)).toFixed(1).replace('.', ',') + ')';
       const ul = document.createElement('ul');
       t.m.forEach((nm, pi) => {
         const li = document.createElement('li'); li.textContent = nm;
@@ -843,6 +852,7 @@
   $('minus').onclick = () => step(-1); $('plus').onclick = () => step(1);
   $('go').onclick = () => { closePick(); go(); };
   $('again').onclick = go;
+  $('strBtn').onclick = () => { S.showStr = S.showStr === false; save(); showResult(); };
   $('back').onclick = closeFull;
   $('drawBtn').onclick = () => { closePick(); openFull('draw'); drawNext(); };
   $('drawNext').onclick = drawNext;
